@@ -1,0 +1,18 @@
+# All tunable values live here. No paths, periods or thresholds in src/.
+
+project:
+  name: finance-variance-analysis-engine
+
+paths:
+  raw_data: data/raw
+  output: data/output
+  logs: logs
+  database: data/variance.db
+
+# Materiality: a variance is flagged only if it breaches BOTH tests.
+materiality:
+  absolute_threshold: 50000
+  percent_threshold: 5.0
+
+logging:
+  level: INFO
