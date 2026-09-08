@@ -21,3 +21,7 @@ logs/*
 
 # macOS
 .DS_Store
+
+# Scratch files for learning, not part of the pipeline
+scratch.py
+scratch/
