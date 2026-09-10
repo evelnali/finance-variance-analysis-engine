@@ -1,0 +1,17 @@
+asset_id,family,asset_class,acquired_year,replacement_cycle_years,capitalized_cost,seats,runs_on,notes
+CNC-01,tangible,CNC_MACHINING_CENTRE,2010,12,350000,,,2010 modernization; never replaced
+CNC-02,tangible,CNC_MACHINING_CENTRE,2010,12,350000,,,2010 modernization; never replaced
+CNC-03,tangible,CNC_MACHINING_CENTRE,2012,12,350000,,,phased in as cash allowed
+SAW-01,tangible,DOUBLE_HEAD_CUTTING_SAW,2013,10,120000,,,second generation
+SAW-02,tangible,DOUBLE_HEAD_CUTTING_SAW,2016,10,120000,,,second generation
+SAW-03,tangible,DOUBLE_HEAD_CUTTING_SAW,2015,10,120000,,,additional saw added 2015
+SAW-04,tangible,DOUBLE_HEAD_CUTTING_SAW,2021,10,120000,,,second generation
+ROUTER-01,tangible,COPY_ROUTER,2019,8,65000,,,third generation
+ROUTER-02,tangible,COPY_ROUTER,2017,8,65000,,,third generation
+ROUTER-03,tangible,COPY_ROUTER,2021,8,65000,,,third generation
+MILL-01,tangible,END_MILLING_MACHINE,2024,6,45000,,,fifth generation
+MILL-02,tangible,END_MILLING_MACHINE,2022,6,45000,,,fifth generation
+SW-CADCAM,intangible,CAD_CAM_SUITE,2015,,140000,6,,design and toolpath generation
+SW-CNCCTL,intangible,CNC_CONTROL,2010,,90000,6,CNC-01;CNC-02;CNC-03,machine control; capitalized with the machines
+SW-RTRCTL,intangible,ROUTER_CONTROL,2017,,55000,4,ROUTER-01;ROUTER-02;ROUTER-03,copy router control
+SW-ERPOPT,intangible,ERP_OPTIMIZATION,2019,,180000,8,,production planning and cut optimization

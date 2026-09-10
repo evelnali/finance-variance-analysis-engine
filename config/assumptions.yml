@@ -1,0 +1,278 @@
+# ============================================================================
+# ASSUMPTIONS REGISTER
+# ============================================================================
+# Every figure the engine produces traces back to a value in this file.
+# These are assumptions, not facts: each is stated so it can be challenged.
+# Changing a number here changes both the generated data and the budget.
+#
+# HOW TO READ THIS FILE
+#   Every value carries its unit and its meaning in the comment beside it.
+#   Where a value feeds a formula, the formula is written above the block.
+#   PM = preventive maintenance (scheduled).  CM = corrective maintenance
+#   (breakdown response).
+#
+# SETTING
+#   A small-scale commercial aluminium window manufacturer, two plants.
+#   It operates cutting, routing and machining equipment, and licenses the
+#   software those machines and its engineers run on.
+#
+# SCOPE
+#   Models maintenance and support SPEND only.
+#   - Amortization of capitalized intangibles is EXCLUDED: it is formulaic,
+#     so variance on it carries no information.
+#   - Cost of downtime is EXCLUDED: an opportunity cost that never reaches the
+#     maintenance GL account. Including it would break the reconciliation to
+#     the ledger that R1 and R2 exist to prove. Downtime is tracked in hours
+#     in fact_activity and reported as a non-financial KPI.
+#   - Patents, goodwill and other IP are out of scope. Only software running
+#     on or alongside the machines is included.
+#
+# SOURCE OF THE NUMBERS
+#   Ratios and rate structures follow general industry practice (the 3-5x
+#   CM:PM multiple, 15-20% annual software support rates). The specific
+#   dollar amounts are illustrative, chosen to be internally consistent and
+#   to produce a plausible total for a plant of this size. They are not
+#   sourced figures, and substituting real ones changes nothing but this file.
+#
+# CURRENCY: CAD throughout.
+#
+# WHAT LIVES WHERE
+#   This file holds RATES AND PRICES - the assumptions.
+#   config/asset_register.csv holds THE ASSETS - what the company owns, when
+#   it was acquired, what it cost, how many seats. Change the register to
+#   change the fleet; change this file to change how the fleet behaves.
+# ============================================================================
+
+calendar:
+  periods: [2025Q1, 2025Q2, 2025Q3, 2025Q4, 2026Q1, 2026Q2, 2026Q3, 2026Q4]
+  months_per_period: 3
+
+# ============================================================================
+# FAMILY 1 - TANGIBLE ASSETS (production machinery)
+# ----------------------------------------------------------------------------
+# Cost behaviour: EPISODIC. A work order happens, and it has a cost.
+#   Volume driver : number of work orders
+#   Price driver  : cost per work order vs standard
+#   Mix driver    : the PM / CM split
+# ============================================================================
+tangible:
+
+  # --------------------------------------------------------------------------
+  # STANDARD COST PER WORK ORDER
+  #   Unit: CAD per work order, per machine of that class. FULLY LOADED -
+  #   includes labour, parts, consumables and contractor time. The
+  #   cost_element_split further down allocates this total across those
+  #   elements for reporting; it does not add to it.
+  #
+  #   PM cost is a genuine fixed price - a scheduled service at a contracted
+  #   rate, the kind of figure that sits in a service agreement.
+  #   CM cost is an EXPECTED AVERAGE - one breakdown may be a CAD 2,000
+  #   sensor, another a CAD 40,000 spindle. This distinction matters at M5:
+  #   variance against a fixed price means someone paid the wrong amount;
+  #   variance against an average may just mean this quarter's failures were
+  #   unusually severe.
+  #
+  #   CM is set at 5x PM for the same machine. Industry practice is 3-5x;
+  #   5x is the conservative end. The differential comes from emergency
+  #   call-out labour rates (roughly 3x scheduled), urgent parts at list price
+  #   plus expedited freight, and collateral damage. Those rates illustrate
+  #   the ratio - they are not model inputs.
+  # --------------------------------------------------------------------------
+  classes:
+    CNC_MACHINING_CENTRE:                 # multi-axis profile machining
+      pm_cost_per_order: 3500         # CAD per scheduled service
+      cm_cost_per_order: 17500        # CAD per breakdown, expected average
+    DOUBLE_HEAD_CUTTING_SAW:              # mitre cutting of aluminium profile
+      pm_cost_per_order: 2800
+      cm_cost_per_order: 14000
+    COPY_ROUTER:                          # lock, handle and hardware cut-outs
+      pm_cost_per_order: 1800
+      cm_cost_per_order: 9000
+    END_MILLING_MACHINE:                  # profile end preparation for joints
+      pm_cost_per_order: 1500
+      cm_cost_per_order: 7500
+
+  # --------------------------------------------------------------------------
+  # DRIVER 1 - CM VOLUME RISES WITH MACHINE AGE
+  #
+  #   cm_orders = cm_base_rate x (1 + age_sensitivity x years_past_grace)
+  #   years_past_grace = max(0, machine_age_years - grace_years)
+  #
+  #   Linear after a grace period rather than exponential: a plant manager can
+  #   follow it, and defensible beats sophisticated in a model someone signs.
+  # --------------------------------------------------------------------------
+  failure:
+    cm_base_rate_per_machine_per_quarter: 0.8
+      # Breakdowns per machine per quarter for a machine still inside its
+      # grace period. 0.8 per quarter is about 3.2 unplanned stoppages a year.
+
+    grace_years: 5
+      # Years from acquisition during which age adds nothing to the failure
+      # rate. Beyond this, the rate climbs.
+
+    age_sensitivity_per_year: 0.15
+      # Proportion of the BASE rate added for each year beyond the grace
+      # period. Not an absolute increase - a multiplier increment.
+      # A machine 9 years past grace: 1 + (0.15 x 9) = 2.35x the base rate.
+
+  # --------------------------------------------------------------------------
+  # DRIVER 2 - PM VOLUME COMES FROM USAGE, NOT AGE
+  #
+  #   pm_orders = operating_hours_per_quarter / pm_service_interval_hours
+  # --------------------------------------------------------------------------
+  servicing:
+    operating_hours_per_machine_per_quarter: 500
+      # Machine running hours in a quarter.
+      #   21 working days per month (allowing for statutory holidays)
+      #   x 8 running hours per day (a plant running close to capacity)
+      #   x 3 months                                   = 504, taken as 500
+      # About 2,000 running hours a year.
+
+    pm_service_interval_hours: 250
+      # Scheduled service every 250 running hours, so 2 services per quarter.
+
+  # --------------------------------------------------------------------------
+  # DRIVER 3 - COST ELEMENT SPLIT
+  #   Proportions of the work-order cost above, by element. Each block sums
+  #   to 1.00. CM pulls in contractors because breakdowns do not wait for
+  #   internal availability - the mechanism behind the tangible price effect.
+  # --------------------------------------------------------------------------
+  cost_element_split:
+    pm:
+      parts: 0.40
+      internal_labour: 0.50
+      contractor: 0.00
+      consumables: 0.10
+    cm:
+      parts: 0.55
+      internal_labour: 0.20
+      contractor: 0.25
+      consumables: 0.00
+
+  # --------------------------------------------------------------------------
+  # DRIVER 4 - RATE DRIFT
+  # --------------------------------------------------------------------------
+  rate_drift:
+    contractor_rate_increase_per_quarter: 0.015
+      # 1.5% per quarter compounding on the contractor element only.
+      # Everything else holds flat.
+
+  # --------------------------------------------------------------------------
+  # WORKED EXAMPLE - one CNC machining centre acquired 2012, in 2026Q3
+  #   machine age        = 2026 - 2012                    = 14 years
+  #   years past grace   = 14 - 5                         = 9
+  #   age factor         = 1 + (0.15 x 9)                 = 2.35
+  #   CM orders          = 0.8 x 2.35                     = 1.88 per quarter
+  #   PM orders          = 500 / 250                      = 2.00 per quarter
+  #   PM cost            = 2.00 x 3,500                   = CAD 7,000
+  #   CM cost            = 1.88 x 17,500                  = CAD 32,900
+  #   expected quarterly maintenance                      = CAD 39,900
+  # --------------------------------------------------------------------------
+
+# ============================================================================
+# FAMILY 2 - INTANGIBLE ASSETS (software on and around the machines)
+# ----------------------------------------------------------------------------
+# Cost behaviour: TWO COMPONENTS.
+#   (a) RECURRING - third-party licence and update fees, per seat per month
+#   (b) EPISODIC  - support incidents, priced as hours x rate x delivery mode
+#
+#   Volume drivers : licensed seats, and support incident count
+#   Price drivers  : fee per seat, and specialist labour rate per hour
+#   Mix drivers    : incident type, and remote vs on-site delivery
+# ============================================================================
+intangible:
+
+  # --------------------------------------------------------------------------
+  # THE SOFTWARE ASSETS themselves live in config/asset_register.csv:
+  #   SW-CADCAM   CAD/CAM suite            6 seats   capitalized 2015
+  #   SW-CNCCTL   CNC control / HMI        6 seats   capitalized 2010
+  #   SW-RTRCTL   Copy router control      4 seats   capitalized 2017
+  #   SW-ERPOPT   ERP + cut optimization   8 seats   capitalized 2019
+  # Each is one licensed product. The rates below apply to all of them.
+  # --------------------------------------------------------------------------
+
+  # DRIVER 5 - THIRD-PARTY LICENSING AND UPDATE FEES (the recurring component)
+  #
+  #   licence_cost = seats x fee_per_seat_per_month x months_in_period
+  # --------------------------------------------------------------------------
+  licensing:
+    fee_per_seat_per_month: 75
+      # CAD per named user per month, covering licence and version updates.
+
+    uplift_at_anniversary: 0.06
+      # 6% increase applied once a year at the licence anniversary.
+      # This is the intangible price effect.
+
+  # --------------------------------------------------------------------------
+  # DRIVER 6 - SUPPORT INCIDENT VOLUME (the episodic component)
+  #   rate_per_instance_per_quarter = expected incidents of this type, for one
+  #   licensed product, in one quarter.
+  # --------------------------------------------------------------------------
+  incidents:
+    routine:                              # testing and calibration after updates
+      rate_per_instance_per_quarter: 1.5
+      hours_per_incident: 4
+      expertise: standard
+    integration:                          # customization and machine integration
+      rate_per_instance_per_quarter: 0.4
+      hours_per_incident: 16
+      expertise: specialist
+    recovery:                             # database reconstruction, backup restore
+      rate_per_instance_per_quarter: 0.15
+      hours_per_incident: 10
+      expertise: specialist
+
+  # --------------------------------------------------------------------------
+  # DRIVER 7 - SERVICE RATES AND DELIVERY MODE
+  #
+  #   incident_cost = hours x rate_per_hour x delivery_multiplier
+  #
+  #   Remote diagnostics avoid travel and dead time, so the same incident
+  #   costs less delivered remotely. The remote / on-site split is the
+  #   intangible mix effect: incidents that should have been handled remotely
+  #   but weren't cost roughly 50% more.
+  # --------------------------------------------------------------------------
+  service_rates:
+    rate_per_hour:
+      standard: 110                       # CAD per hour, general support
+      specialist: 185                     # CAD per hour, senior engineer
+
+    delivery_multiplier:
+      remote: 0.65                        # remote session, no travel
+      onsite: 1.00                        # engineer attends the plant
+
+    planned_remote_share: 0.70
+      # Proportion of incidents the plan assumes are handled remotely.
+      # Blended planned multiplier = (0.70 x 0.65) + (0.30 x 1.00) = 0.755
+
+    rate_drift_per_quarter: 0.02
+      # 2% per quarter compounding on support labour rates.
+
+  # --------------------------------------------------------------------------
+  # DRIVER 8 - COST ELEMENT SPLIT
+  #   Applied to the computed incident cost for reporting. Each block sums
+  #   to 1.00. Does not change the total.
+  # --------------------------------------------------------------------------
+  cost_element_split:
+    routine:
+      standard_labour: 0.70
+      infrastructure: 0.30                # remote diagnostic tooling, connectivity
+    integration:
+      specialist_labour: 0.85
+      standard_labour: 0.15
+    recovery:
+      specialist_labour: 0.60
+      standard_labour: 0.20
+      infrastructure: 0.20
+
+  # --------------------------------------------------------------------------
+  # WORKED EXAMPLE - the CAD/CAM suite, 6 seats, in one quarter
+  #   licence cost     = 6 seats x 75 x 3 months           = CAD 1,350
+  #   routine cost     = 4h x 110 x 0.755                  = CAD 332 each
+  #                      x 1.5 expected                    = CAD 498
+  #   integration cost = 16h x 185 x 0.755                 = CAD 2,235 each
+  #                      x 0.4 expected                    = CAD 894
+  #   recovery cost    = 10h x 185 x 0.755                 = CAD 1,397 each
+  #                      x 0.15 expected                   = CAD 210
+  #   expected quarterly support and licence cost          = CAD 2,952
+  # --------------------------------------------------------------------------

@@ -10,9 +10,18 @@ paths:
   database: data/variance.db
 
 # Materiality: a variance is flagged only if it breaches BOTH tests.
+#
+# Thresholds are set PER FAMILY. Tangible maintenance runs ~$230k a quarter;
+# software runs ~$14k. A single absolute threshold would make the software
+# family permanently invisible - no overrun there could ever breach it.
+# Different thresholds for different account groups is ordinary close practice.
 materiality:
-  absolute_threshold: 50000
-  percent_threshold: 5.0
+  tangible:
+    absolute_threshold: 25000     # ~11% of quarterly tangible spend
+    percent_threshold: 5.0
+  intangible:
+    absolute_threshold: 3000      # ~21% of quarterly software spend
+    percent_threshold: 5.0
 
 logging:
   level: INFO
