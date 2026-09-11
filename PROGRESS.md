@@ -24,3 +24,14 @@ threshold would hide the software family; switched to per-family thresholds.
 Bugs found: a return indented inside a for loop (wrong number, no error),
 = instead of +=, and an f-string that compiles on 3.13 but not on 3.10.
 - Next: M2 chunk 3. generate_data.py, the seeded generator.
+
+## 2026-09-11
+- Done: M2 chunk 3a. generate_data.py writes data/raw/budget.csv - 256 rows,
+the modelled expectation for all 8 periods. Grain is asset x period x cost
+type, with quantity + uom so work orders, seats and incidents stay separable
+for price/volume/mix later. Added a per-period total printed at generation
+time as a standing self-check. Bug: order counts passed into the amount slot
+- no error, just a budget where machines cost 2 dollars. Found by explaining
+the 39.36 difference rather than eyeballing it.
+- Next: M2 chunk 3b. The actuals extract - same shape, plus noise and the
+planted anomalies.
