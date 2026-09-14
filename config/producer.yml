@@ -1,0 +1,22 @@
+# The generator's private configuration.
+# Nonthing in src/model.py may read this file. 
+# model.py is the ANALYSER'S view of the workld -- what a planner would know in advance.
+# This is what actually happened, including things nobody planned. 
+# Keeping them in separate files is what makes the variance analysis 
+# a test rather than a mirror: if both sides ran off the same numbers, the engine could only ever confirm the model it was built from.
+
+# Any fixed integer. Changing it reshuffles every random draw, so that whole dataset changes.
+# Fixed here so that a reviewer who clones the repo and runs it gets byte-identical files. 
+seed: 20260914
+
+noise: 
+  # Counts of unplanned events are drawn from a Poisson Distribution with the modelled figure as its mean.
+  # No paratmeter needed here -- the mean IS the paratmeter, and it comes from the driver model. 
+
+  # Cost per unit varies around standard. 0.12 means roughly two thirds of work orders land within 12% of standard costs
+  # -- a resonable spread once parts, labour hours and call-out timing are misxed together.
+  price_spread: 0.12
+
+  # Floor on the multiplier, so an extreme draw can never produce a negative or absurd cost. 
+  # Belt and braces; it should almost never bind. 
+  price_floor: 0.60

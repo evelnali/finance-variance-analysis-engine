@@ -4,6 +4,9 @@
 
 import csv
 
+import numpy as np
+import yaml 
+
 from src.config import PROJECT_ROOT
 
 from src.model import (
@@ -14,7 +17,13 @@ from src.model import (
 )
 
 RAW_DIR = PROJECT_ROOT/"data"/"raw"
+PRODUCER_PATH = PROJECT_ROOT/"config"/"producer.yml"
 
+
+def load_producer_config():
+    """Read the generator's private config.(producer.yml).  modle.py must never call this."""
+    with open(PRODUCER_PATH,"r") as f:
+        return yaml.safe_load(f)
 
 def make_row(period,asset,cost_type,quantity,uom,amount):
     """Build one extract row as a dictionary.
@@ -30,6 +39,7 @@ def make_row(period,asset,cost_type,quantity,uom,amount):
         "uom":uom,
         "amount":round(amount,2),
     }
+
 
 def build_budget_rows(assumptions,register):
     """Run the driver model over every asset in every period."""
@@ -60,9 +70,66 @@ def build_budget_rows(assumptions,register):
     return rows
 
 
+def build_actual_rows(budget_rows,pro_cfg,rng):
+    """Turn each budget row into what actually happened. 
+    One budget row in, one actual row out, same grain -- so every expectation has exactly one 
+    outcome to be mearured against. How much a line varies depends on what kind of sepnd it is: 
+
+        LICENSE -- a acontract. Fixed seats at a fixed fee. No variations. 
+        PM (Preventative Maintenance) -- scheduled. The count isthe plan; only the cost varies.
+        CM (Corrective Maintenance) -- unscheduled. Count and cost both vary. 
+        SUPPORT -- unscheduled. Count and cost both vary. 
+
+    That distinction is the model, not a shortcut: scheduled work varies in price, unscheduled work varies 
+    in price and volume.
+    """
+    noise = pro_cfg["noise"]
+    rows = []
+
+    for b in budget_rows:
+
+        if b["cost_type"]=="LICENSE":
+            # a license is a contract. Nothing to draw. 
+            quantity = b["quantity"]
+            amount  = b["amount"]
+
+        else:
+            # Standard cost per unit, recovered from the budget row itself.
+            # a quantity = 0 would crash.
+            standard_cost=b["amount"]/b["quantity"] if b["quantity"] else 0.0
+
+            if b["cost_type"] =="PM":
+                # scheduled work: do the services the plan calls for. 
+                quantity = b["quantity"]
+            else:
+                # Poisson distrution - Poisson draws a a whole number of events given an average rate. 
+                # This is why actuals need their own shape and cannot just be budget multiplied by a percentage.
+                quantity = float(rng.poisson(b["quantity"]))
+
+            multiplier = max(
+                noise["price_floor"], rng.normal(1.0,noise["price_spread"])
+            )
+            amount = quantity * standard_cost * multiplier 
+
+        rows.append(
+            {
+                "period":b["period"],
+                "asset_id":b["asset_id"],
+                "family": b["family"],
+                "cost_type": b["cost_type"],
+                "quantity": round(quantity,2),
+                "uom": b["uom"],
+                "amount":round(amount,2),
+            }
+        )
+
+    return rows
+
+
 
 def write_csv(path,rows):
     """Write a list of dictionaries to a CSV file."""
+    # create a data/raw if it does not exist.
     path.parent.mkdir(parents=True,exist_ok=True)
 
     with open(path,"w",newline="") as f:
@@ -71,25 +138,56 @@ def write_csv(path,rows):
         writer.writerows(rows)
 
 
+def report_by_period(assumptions,budget_rows,actual_rows):
+    """Budget against actual for every period -- the first sight of variance.
+    Sign convention: variance = actual - budget. 
+    These are expenses, so a POSITIVE variance is an overspend, and unfavourable.
+    """
+    print(f"{'PERIOD':<10}{'BUDGET':>14}{'ACTUAL':>14}{'VARIANCE':>14}{'%':>8}")
+    print("-"*60)
+
+    for period in assumptions["calendar"]["periods"]:
+        budget = sum(r["amount"] for r in budget_rows if r["period"] == period)
+        actual = sum(r["amount"] for r in actual_rows if r["period"]== period)
+        variance = actual - budget
+        percent = (variance/budget*100) if budget else 0.0
+
+        print(
+            f"{period:<10}{budget:>14,.0f}{actual:>14,.0f}"
+            f"{variance:>14,.0f}{percent:>7.1f}%"
+        )
+
+    budget_total = sum(r["amount"] for r in budget_rows)
+    actual_total = sum(r["amount"] for r in actual_rows)
+    variance_total = actual_total - budget_total
+    percent_total = (variance_total/budget_total*100) if budget_total else 0.0
+
+    print("-"*60)
+    print(
+        f"{'TOTAL':<10}{budget_total:>14,.0f}{actual_total:>14,.0f}"
+        f"{variance_total:>14,.0f}{percent_total:>7.1f}%"
+    )
+
 
 def main():
     """Build every extract and write it to data/raw."""
     assumptions =load_assumptions()
     register = load_asset_register()
+    producer_cfg = load_producer_config()
+    rng =np.random.default_rng(producer_cfg["seed"])
 
     budget_rows =build_budget_rows(assumptions,register)
     budget_path = RAW_DIR/"budget.csv"
     write_csv(budget_path,budget_rows)
 
-    total = sum(r["amount"] for r in budget_rows)
+    actual_rows = build_actual_rows(budget_rows,producer_cfg,rng)
+    actual_path = RAW_DIR/"actual.csv"
+    write_csv(actual_path,actual_rows)
 
+    print(f"Wrote {len(budget_rows)} budget rows and {len(actual_rows)} actual rows")
     print()
-    for period in assumptions["calendar"]["periods"]:
-        period_total = sum(r["amount"] for r in budget_rows if r["period"]==period)
-        print(f"{period:<10}{period_total:>14,.0f}") 
+    report_by_period(assumptions,budget_rows,actual_rows)
 
-    print(f"Wrote {len(budget_rows)} rows to {budget_path}")
-    print(f"Total expected cost, all periods: {total:,.0f}")
 
 
 if __name__=="__main__":
