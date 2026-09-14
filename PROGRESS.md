@@ -35,3 +35,20 @@ time as a standing self-check. Bug: order counts passed into the amount slot
 the 39.36 difference rather than eyeballing it.
 - Next: M2 chunk 3b. The actuals extract - same shape, plus noise and the
 planted anomalies.
+
+## 2026-09-14
+- Done: M2 chunk 3b-i. actual.csv now written alongside budget.csv - each
+budget row turned into an outcome. Unplanned counts (CM, support) drawn from
+Poisson; unit costs drawn around standard; licences left untouched because a
+contract is a contract. producer.yml holds the seed and the noise settings and
+is read only by generate_data.py - model.py never sees it, which is what keeps
+the analysis a test rather than a mirror. Checks pass: 256 rows, licence total
+44,496 unchanged, scheduled servicing count exactly 192.
+- Finding: baseline noise is +2.2% overall but swings +/-22% quarter to quarter,
+because 3 CNC machines carry 45% of spend at ~2 breakdowns each. Noise alone
+breaches the 25k threshold in 4 quarters of 8. Not yet resolved - decide after
+seeing whether the planted anomalies stand out against it.
+- Bugs: YAML keys not indented under their parent (came back empty, not empty
+box); price noise stranded inside one branch of an if, so PM rows never got an
+amount; return inside the loop again; .of instead of .0f.
+- Next: M2 chunk 3b-ii. The planted anomalies.
