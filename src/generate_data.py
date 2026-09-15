@@ -1,6 +1,13 @@
-"""Generate the ERP-style extracts the pipeline reads."""
-"""Chunk 3a: the budget extract -- the modelled expectation, one row per asset, per period, per cost type.
- Acutals with planted anomalies come next"""
+"""Generate the ERP-style extracts the pipeline reads.
+
+Two extracts, same grain: budget.csv is the modelled expectation, actual.csv
+is what happened - noise, plus the problems planted in producer.yml. One
+budget row and one actual row for every asset, period and cost type, so every
+expectation has exactly one outcome to be measured against.
+
+Nothing in src/model.py may read producer.yml. That separation is what makes
+the variance analysis a test rather than a mirror.
+"""
 
 import csv
 
@@ -26,6 +33,25 @@ def load_producer_config():
         return yaml.safe_load(f)
     
 
+# ---- the Planted anomalies ----------
+def rule_matches(rule,row):
+    """Does this rule apply to this row? 
+    An absent key means "applies to everything", so a rule only fails to match when the key 
+    IS there and this row is not named in it. 
+    That is what lets A3 and A4 hit the whole fleet without listing all 16 assets.
+
+    Defined once and used in two places - by anomaly_multipliers when writting the data, and
+    by check_planted wen proving it landed. If the test lived in both, the two could drift apart. 
+    """
+    if rule.get("assets") and row["asset_id"] not in rule["assets"]:
+        return False
+    if rule.get("periods") and row["period"] not in rule["periods"]:
+        return False
+    if rule.get("cost_types") and row["cost_type"] not in rule["cost_types"]:
+        return False
+    return True
+
+
 
 def anomaly_multipliers(row, anomalies):
     """How much the planted problems change this row's volumn and its price.
@@ -38,28 +64,23 @@ def anomaly_multipliers(row, anomalies):
 
     quantity_multiplier = 1.0
     price_multiplier = 1.0
-
-    for rule in anomalies: 
-        # .get("assets") hands back None when the key is not in the rule at all. 
-        # An absent key means "applies to everything", 
-
-        if rule.get("assets") and row["asset_id"] not in rule["assets"]:
-            continue
-        if rule.get("periods") and row["period"] not in rule["periods"]:
-            continue
-        if rule.get("cost_types") and row["cost_type"] not in rule["cost_types"]:
+    for rule in anomalies:
+        if not rule_matches(rule,row):
             continue
 
         # the 2nd argument to .get() is what to use when the key is missing. 
-        # 1.0 means "no effect", so a rule that only changes volume leaves price along. 
-        quantity_multiplier *= rule.get("quantity_multiplier", 1.0)
-        price_multiplier *= rule.get("price_multiplier", 1.0)
+        # 1.0 means "no effect".
+
+        quantity_multiplier *= rule.get("quantity_multiplier",1.0)
+        price_multiplier *= rule.get("price_multiplier",1.0)
 
     return quantity_multiplier,price_multiplier
+
 
 def print_planted(anomalies):
     """List what was planted. Generator-side only - for the README at M6."""
     print("Planted anomalies (the analyser is never told any of this):")
+
     for rule in anomalies:
         periods = rule.get("periods",["all periods"])
         span = periods[0] if len(periods) == 1 else f"{periods[0]}-{periods[-1]}"
@@ -74,6 +95,44 @@ def print_planted(anomalies):
         print(f" {rule['id']:<5}{span:<20}{' + '.join(effects):<18}{scope}")
     print()
 
+def check_planted(budget_rows,actual_rows,anomalies):
+    """Prove each rule landed on the rows it was aimed at.
+    
+    The generator's own time-out. Without it, "the anomalies are planted" is a claim;
+    with it, it is a figure printed on every run.
+    
+    A4a should tie exactly, because scheduled servicing is not drawn at random.
+    The drawn ones land near expectation, not on it. A price-only rule must show expected equal
+    to budget - if its actual has moved, prices and volume are getting mixed up.
+    """
+
+    print("Planting check - work orders on the rows each rule targets:")
+    print(f"{'RULE':<6}{'BUDGET':>11}{'EXPECTED':>11}{'ACTUAL':>11}")
+
+    for rule in anomalies:
+        # [x for x in things if ...] builds a new list of just ones that pass the test
+        budget_hit = [r for r in budget_rows if rule_matches(rule,r)]
+        actual_hit = [r for r in actual_rows if rule_matches(rule,r)]
+
+        budget_qty = sum(float(r["quantity"]) for r in budget_hit)
+        actual_qty = sum(float(r["quantity"]) for r in actual_hit)
+        # Expected has to account for EVERY rule that touches these rows, not
+        # just this one. A3's rows are also hit by A1, A2 and A4b, so judging
+        # A3 against its own multiplier alone makes a correct result look wrong.
+        expected_qty = sum(
+            float(r["quantity"]) * anomaly_multipliers(r, anomalies)[0]
+            for r in budget_hit
+        )
+
+        print(
+            f"  {rule['id']:<6}{budget_qty:>9.1f}"
+            f"{expected_qty:>10.1f}{actual_qty:>9.0f}"
+        )
+
+
+# ----------------------------------------------------------------------------------
+# Building the two extracts.
+# ---------------------------------------------------------------------------------
 
 def make_row(period,asset,cost_type,quantity,uom,amount):
     """Build one extract row as a dictionary.
@@ -149,6 +208,13 @@ def build_actual_rows(budget_rows,pro_cfg,rng):
             # Standard cost per unit, recovered from the budget row itself.
             # a quantity = 0 would crash.
             standard_cost=b["amount"]/b["quantity"] if b["quantity"] else 0.0
+
+            # An anomaly changes the RATE at which things happen, so it is
+            # applied to the expected count BEFORE the draw - never to the
+            # drawn number afterwards. Raising 1.04 to 1.66 and then drawing
+            # gives whole work orders with the right spread; drawing first and
+            # multiplying after would give 1.6 work orders, which do not
+            # exist, and would hide how lumpy the result should be.
             expected_count = b["quantity"]*qty_mult
 
             if b["cost_type"] =="PM":
@@ -180,12 +246,19 @@ def build_actual_rows(budget_rows,pro_cfg,rng):
 
 
 
+
+# ------------------------------------------------------
+# Outputs
+# ------------------------------------------------------
+
 def write_csv(path,rows):
     """Write a list of dictionaries to a CSV file."""
     # create a data/raw if it does not exist.
     path.parent.mkdir(parents=True,exist_ok=True)
 
-    with open(path,"w",newline="") as f:
+    # newline="" is required when writing CSV. without it would get a blank line
+    # between every row on some systems.
+    with open(path,"w",newline="") as f:   
         writer = csv.DictWriter(f,fieldnames=rows[0].keys())
         writer.writeheader()
         writer.writerows(rows)
@@ -194,7 +267,7 @@ def write_csv(path,rows):
 def report_by_period(assumptions,budget_rows,actual_rows):
     """Budget against actual for every period -- the first sight of variance.
     Sign convention: variance = actual - budget. 
-    These are expenses, so a POSITIVE variance is an overspend, and unfavourable.
+    These are expenses, so a POSITIVE variance is an overspend, and unfavourable. vice versa.
     """
     print(f"{'PERIOD':<10}{'BUDGET':>14}{'ACTUAL':>14}{'VARIANCE':>14}{'%':>8}")
     print("-"*60)
@@ -227,7 +300,9 @@ def main():
     assumptions =load_assumptions()
     register = load_asset_register()
     producer_cfg = load_producer_config()
+
     rng =np.random.default_rng(producer_cfg["seed"])
+    anomalies = producer_cfg.get("anomalies",[])
 
     budget_rows =build_budget_rows(assumptions,register)
     budget_path = RAW_DIR/"budget.csv"
@@ -237,7 +312,9 @@ def main():
     actual_path = RAW_DIR/"actual.csv"
     write_csv(actual_path,actual_rows)
 
-    print_planted(producer_cfg.get("anomalies",[]))
+    print_planted(anomalies)
+    check_planted(budget_rows,actual_rows,anomalies)
+
     print(f"Wrote {len(budget_rows)} budget rows and {len(actual_rows)} actual rows")
     print()
     report_by_period(assumptions,budget_rows,actual_rows)

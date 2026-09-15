@@ -52,3 +52,35 @@ seeing whether the planted anomalies stand out against it.
 box); price noise stranded inside one branch of an if, so PM rows never got an
 amount; return inside the loop again; .of instead of .0f.
 - Next: M2 chunk 3b-ii. The planted anomalies.
+
+
+## 2026-09-15
+- Done: M2 chunk 3b-ii. Five anomalies planted into actual.csv from producer.yml
+- Total five effects - three volume effects, one price effect, one favourable. All config-driven:
+adding a sixth is a YAML change, not a code change. model.py still knows nothing
+about any of them. Verified at row level: PM count drops to 12 in 2025Q4 only,
+routers draw 5 and 9 corrective jobs against a budget of 3.1, SAW-02 draws 3
+against 1.4.
+- Bugs, all the same kind: a mistyped key in .get() returns empty and the program
+carries on. "anomolies" in the YAML meant nothing was planted at all; "asseets"
+and "csot_types" in the Python meant every rule applied to every asset and every
+cost type, giving a 175% variance. Python cannot tell a key you don't have from
+a key you meant to have.
+- FINDING - this is the one that matters. Period totals cannot see the planted
+problems, because they net opposing stories into one line. 2025Q4 shows +32,160
+overall; split by cost type it is -30,624 on scheduled servicing and +62,440 on
+breakdowns - two real and opposite stories hidden in one figure. The copy router
+fault is worth ~17,000 a quarter against a 25,000 threshold, so no dollar-amount
+test ever fires on it; but the routers run under budget through 2025 and over
+budget in all four quarters of 2026, flipping at exactly the date the fault
+starts. Counter-example: 2025Q1 has nothing planted and still ran 46,621 over on
+breakdowns, which is larger than the real fault. So a rule of "flag anything over
+40,000" would chase 2025Q1 and never look at the routers.
+- Verified by a planting check built into the generator: it prints, per rule,
+the budgeted work orders on the rows that rule targets, what the multiplier
+should make of them, and what actually landed. A4a ties exactly (24 -> 12);
+the drawn ones land near expectation; the price-only rule leaves volume alone.
+- Consequence for M5: variance views must split by cost type and by asset class,
+and must test direction repeating across consecutive quarters, not dollar amount
+in any single quarter.
+- Next: M2 chunk 4. ingest.py and control C1.
