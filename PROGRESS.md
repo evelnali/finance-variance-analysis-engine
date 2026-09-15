@@ -84,3 +84,18 @@ the drawn ones land near expectation; the price-only rule leaves volume alone.
 and must test direction repeating across consecutive quarters, not dollar amount
 in any single quarter.
 - Next: M2 chunk 4. ingest.py and control C1.
+
+
+## 2026-09-15 (evening)
+- Done: M2 chunk 4. ingest.py reads both extracts and runs control C1 -
+schema conformance, in Python, before the load. First pipeline module to use
+the logger instead of print(). Result is shaped like a control_results row so
+M3 can store it unchanged; a failure exits non-zero, which is what CI reads.
+Expected columns live in settings.yml, so a third extract is a config change.
+Verified by breaking a column name on purpose and watching C1 catch it.
+- config.py had been asking for materiality.absolute_threshold since the split
+into per-family thresholds - caught at startup the first time ingest loaded
+settings, with the key named. The M1 validation doing its job. Fixed, and it
+now walks keys at any depth and reports all missing ones at once.
+- Next: M2 chunk 5. load.py - land raw into SQLite idempotently with a run_id,
+then R1.

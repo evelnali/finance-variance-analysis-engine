@@ -25,3 +25,16 @@ materiality:
 
 logging:
   level: INFO
+
+
+
+# The extracts the pipeline expects, and the columns each one must have.
+# C1 (control#1) Checks a file against list before anything else touches it. 
+# Adding a third extract is a change here plus a file - not a code change. 
+extracts:
+  budget:
+    file: budget.csv
+    columns: [period,asset_id,family,cost_type,quantity,uom,amount]
+  actual:
+    file: actual.csv
+    columns: [period,asset_id,family,cost_type,quantity,uom,amount] 

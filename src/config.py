@@ -15,8 +15,11 @@ REQUIRED_KEYS = [
     ("paths","output"),
     ("paths","logs"),
     ("paths", "database"),
-    ("materiality","absolute_threshold"),   
-    ("materiality","percent_threshold"),
+    ("materiality","tangible","absolute_threshold"),   
+    ("materiality","tangible","percent_threshold"),
+    ("materiality","intangible","absolute_threshold"),   
+    ("materiality","intangible","percent_threshold"),
+    ("extracts",),
 ]
 
 def load_settings():
@@ -27,22 +30,36 @@ def load_settings():
     with open(SETTINGS_PATH, "r") as f: 
         settings = yaml.safe_load(f)        
 
-        # report every missing key at once, not just the first one found. 
+    # report every missing key at once, not just the first one found. 
     missing = []
-    for section,key in REQUIRED_KEYS:
-        if settings.get(section) is None or key not in settings[section]:
-            missing.append(f"{section}.{key}")
+    for path in REQUIRED_KEYS:
+        # walk down one level at a time. here starts as the whole settings dic and moves deeper with each key
+        # in the path, so one loop handles keys at any depth.
+        here = settings
+        for key in path:
+            # isinstance(x,dict) asks "is this still something I can look inside? "
+            # if a key holds a plan number, there is nothing underneath it to keep walking into.
+            if not isinstance(here, dict) or key not in here:
+                missing.append(".".join(path))
+                break
+            here = here[key]
 
-        if missing:
-            raise ValueError(f"settings.yml is missing required keys: {', '.join(missing)}")
+    if missing:
+        raise ValueError(f"settings.yml is missing required keys: {', '.join(missing)}")
 
     return settings
+
 
 if __name__ == "__main__":
     # run this file directly to test the settings file. 
     settings = load_settings()
-    threshold = settings["materiality"]["absolute_threshold"]
-    percent = settings["materiality"]["percent_threshold"]
 
-    print(f"Loaded {len(settings)} sections from {SETTINGS_PATH.name}")
-    print(f"Materiality: ${threshold:,.2f} and {percent:.1f}%")
+    print(f"Loaded {len[settings]} sections from {SETTINGS_PATH.name}")
+
+    for family, limits in settings["materiality"].item():
+        print(
+            f". {family:<12}   ${limits['absolute_threshold']:>8,.0f}"
+            f". and {limits['percent_threshold']:.1f}%"
+            )
+    
+    print(f"  {len(settings['extracts'])} extracts declared")
