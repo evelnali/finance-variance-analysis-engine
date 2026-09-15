@@ -20,3 +20,50 @@ noise:
   # Floor on the multiplier, so an extreme draw can never produce a negative or absurd cost. 
   # Belt and braces; it should almost never bind. 
   price_floor: 0.60
+
+
+# -----------------------------------------------------------------------------------
+# PLANTED ANOMALIES (A#)
+#
+# Deliberate problems written in to actual.csv. model.py is never told about any of them
+# -- that is the whole point.  If the analyzer knew, the analysis would only be confirming
+# what it was handed. 
+#
+# Each rule says which rows it touches and what it multiplies. Leave a key out and it matches
+# everything: A3 and A4 have no "asset" line, so they hit the whole fleet. 
+# Adding a fifth problem later is a change here, not in the code. 
+# -------------------------------------------------------------------------------------
+anomalies:
+
+  - id: A1
+    what: copy routers running an outdated control software version
+    assets: [ROUTER-01,ROUTER-02,ROUTER-03]
+    periods: [2026Q1,2026Q2,2026Q3,2026Q4]
+    cost_types: [CM]
+    quantity_multiplier: 1.6
+
+  - id: A2
+    what: SAW-02 failing well beyond its age curve
+    assets: [SAW-02]
+    periods: [2025Q3,2025Q4,2026Q1,2026Q2,2026Q3,2026Q4]
+    cost_types: [CM]
+    quantity_multiplier: 2.2
+
+  - id: A3
+    what: contractor rate rise -- a price effect with no change in volume
+    periods: [2026Q2,2026Q3,2026Q4]
+    cost_types: [CM]
+    price_multiplier: 1.12
+
+  - id: A4a
+    what: half the scheduled servicing deferred to save cash
+    periods: [2025Q4]
+    cost_types: [PM]
+    quantity_multiplier: 0.5
+
+  - id: A4b
+    what: the breakdowns that followed from deferring it (A4a)
+    periods: [2026Q1,2026Q2]
+    cost_types: [CM]
+    quantity_multiplier: 1.25
+

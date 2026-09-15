@@ -3,7 +3,7 @@
 from pathlib import Path
 import yaml
 
-# Anchor paths to this file's location, so the pipeline works no matter with folder the command was run from. 
+# Anchor paths to this file's location, so the pipeline works no matter which folder the command was run from. 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SETTINGS_PATH = PROJECT_ROOT / "config" / "settings.yml"
 

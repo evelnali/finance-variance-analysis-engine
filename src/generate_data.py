@@ -24,6 +24,56 @@ def load_producer_config():
     """Read the generator's private config.(producer.yml).  modle.py must never call this."""
     with open(PRODUCER_PATH,"r") as f:
         return yaml.safe_load(f)
+    
+
+
+def anomaly_multipliers(row, anomalies):
+    """How much the planted problems change this row's volumn and its price.
+    
+    Returns two numbers, both 1.0 with nothing applies.
+    
+    Several anomalies can land on the same row, and then they mutiply together
+    -- which is what really happens. A saw that is failing early is also paying the contractor's new rate.
+    """
+
+    quantity_multiplier = 1.0
+    price_multiplier = 1.0
+
+    for rule in anomalies: 
+        # .get("assets") hands back None when the key is not in the rule at all. 
+        # An absent key means "applies to everything", 
+
+        if rule.get("assets") and row["asset_id"] not in rule["assets"]:
+            continue
+        if rule.get("periods") and row["period"] not in rule["periods"]:
+            continue
+        if rule.get("cost_types") and row["cost_type"] not in rule["cost_types"]:
+            continue
+
+        # the 2nd argument to .get() is what to use when the key is missing. 
+        # 1.0 means "no effect", so a rule that only changes volume leaves price along. 
+        quantity_multiplier *= rule.get("quantity_multiplier", 1.0)
+        price_multiplier *= rule.get("price_multiplier", 1.0)
+
+    return quantity_multiplier,price_multiplier
+
+def print_planted(anomalies):
+    """List what was planted. Generator-side only - for the README at M6."""
+    print("Planted anomalies (the analyser is never told any of this):")
+    for rule in anomalies:
+        periods = rule.get("periods",["all periods"])
+        span = periods[0] if len(periods) == 1 else f"{periods[0]}-{periods[-1]}"
+
+        effects =[]
+        if "quantity_multiplier" in rule:
+            effects.append(f"volumn x{rule['quantity_multiplier']}")
+        if "price_multiplier" in rule: 
+            effects.append(f"price x{rule['price_multiplier']}")
+
+        scope = ", ".join(rule.get("assets",["whole fleet"]))
+        print(f" {rule['id']:<5}{span:<20}{' + '.join(effects):<18}{scope}")
+    print()
+
 
 def make_row(period,asset,cost_type,quantity,uom,amount):
     """Build one extract row as a dictionary.
@@ -84,9 +134,11 @@ def build_actual_rows(budget_rows,pro_cfg,rng):
     in price and volume.
     """
     noise = pro_cfg["noise"]
+    anomalies = pro_cfg.get("anomalies",[])
     rows = []
 
     for b in budget_rows:
+        qty_mult, price_mult = anomaly_multipliers(b,anomalies)
 
         if b["cost_type"]=="LICENSE":
             # a license is a contract. Nothing to draw. 
@@ -97,19 +149,20 @@ def build_actual_rows(budget_rows,pro_cfg,rng):
             # Standard cost per unit, recovered from the budget row itself.
             # a quantity = 0 would crash.
             standard_cost=b["amount"]/b["quantity"] if b["quantity"] else 0.0
+            expected_count = b["quantity"]*qty_mult
 
             if b["cost_type"] =="PM":
-                # scheduled work: do the services the plan calls for. 
-                quantity = b["quantity"]
+                # scheduled work: so no draw - but it must stay whole services. 
+                quantity = float(round(expected_count))
             else:
                 # Poisson distrution - Poisson draws a a whole number of events given an average rate. 
                 # This is why actuals need their own shape and cannot just be budget multiplied by a percentage.
-                quantity = float(rng.poisson(b["quantity"]))
+                quantity = float(rng.poisson(expected_count))
 
             multiplier = max(
                 noise["price_floor"], rng.normal(1.0,noise["price_spread"])
             )
-            amount = quantity * standard_cost * multiplier 
+            amount = quantity * standard_cost * multiplier * price_mult
 
         rows.append(
             {
@@ -184,6 +237,7 @@ def main():
     actual_path = RAW_DIR/"actual.csv"
     write_csv(actual_path,actual_rows)
 
+    print_planted(producer_cfg.get("anomalies",[]))
     print(f"Wrote {len(budget_rows)} budget rows and {len(actual_rows)} actual rows")
     print()
     report_by_period(assumptions,budget_rows,actual_rows)
