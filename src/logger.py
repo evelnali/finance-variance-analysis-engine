@@ -2,9 +2,7 @@
 
 import logging
 from datetime import datetime
-from venv import logger
 
-from pygments import console
 
 # import from own code. src.config is the module,
 # so PROJECT_ROOT and load_settings are reused rather than redefined here.
