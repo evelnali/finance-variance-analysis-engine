@@ -29,7 +29,7 @@ def connect(settings):
 
 def create_schema(conn,log):
     """Create the tables, by running the  .sql file.
-    The table layouts live in their own  .sql file rather than inside Python, so someone can 
+    The table layouts live in their own .sql file rather than inside Python, so someone can 
     read what the tables look like without reading any code.
 
     Every line in that file says "if not exists", so running it again on a database that already
@@ -47,7 +47,7 @@ def land_extract(conn,table,rows,period,run_id,log):
     would leave another copy of the quarter behind and the totals would quietly grow, with 
     no error anywhere to tell you.
     """
-    loaded_at = datetime.now().strftime("%Y-%m-%d %H:%M%S")
+    loaded_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
     # the ? is a blank that database fills in from the values that follow. Always leave a blank rather than building

@@ -22,6 +22,7 @@ REQUIRED_KEYS = [
     ("extracts",),
 ]
 
+
 def load_settings():
     """Read settings.yml, verify the keys the pipeline depends on, and return it."""
     if not SETTINGS_PATH.exists():
@@ -33,12 +34,12 @@ def load_settings():
     # report every missing key at once, not just the first one found. 
     missing = []
     for path in REQUIRED_KEYS:
-        # walk down one level at a time. here starts as the whole settings dic and moves deeper with each key
+        # walk down one level at a time. here starts as the whole settings dict and moves deeper with each key
         # in the path, so one loop handles keys at any depth.
         here = settings
         for key in path:
             # isinstance(x,dict) asks "is this still something I can look inside? "
-            # if a key holds a plan number, there is nothing underneath it to keep walking into.
+            # if a key holds a plain number, there is nothing underneath it to keep walking into.
             if not isinstance(here, dict) or key not in here:
                 missing.append(".".join(path))
                 break

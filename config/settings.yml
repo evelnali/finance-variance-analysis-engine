@@ -9,7 +9,7 @@ paths:
   logs: logs
   database: data/variance.db
 
-# Materiality: a variance is flagged only if it breaches BOTH tests.
+# Materiality: a variance is flagged only if it breaches BOTH materiality tests.
 #
 # Thresholds are set PER FAMILY. Tangible maintenance runs ~$230k a quarter;
 # software runs ~$14k. A single absolute threshold would make the software

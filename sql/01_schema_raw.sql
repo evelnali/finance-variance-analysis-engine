@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS raw_actual(
 );
 
 -- Nearly every question the pipeline asks starts with "for this quarter". 
--- These two lines tell the database to keep the period column sorted, so 
+-- These two lines tell the database to keep the period column sorted, behind the scene, so 
 -- finding one quarter's row statys quick as the table grows. Same idea as sorting 
 -- a spreadsheet column before you start looking things up in it. 
 CREATE INDEX IF NOT EXISTS idx_raw_budget_period ON raw_budget(period);
