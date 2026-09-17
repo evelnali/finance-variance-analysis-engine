@@ -1,7 +1,6 @@
 """Pipeline entry point. Orchestrates the six layers; currently a skeleton."""
 
 import argparse
-from pdb import main
 from src.config import load_settings
 from src.logger import new_run_id, setup_logger
 
