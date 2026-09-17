@@ -99,3 +99,19 @@ settings, with the key named. The M1 validation doing its job. Fixed, and it
 now walks keys at any depth and reports all missing ones at once.
 - Next: M2 chunk 5. load.py - land raw into SQLite idempotently with a run_id,
 then R1.
+
+## 2026-09-17
+- Done: M2 chunk 5, and M2 is finished. load.py puts both extracts into
+SQLite one quarter at a time. Table layouts live in sql/01_schema_raw.sql,
+not in Python. Every column is stored as text on purpose - so a row in the
+raw table can always be shown to match a line in the file, and a bad value
+gets caught by a control instead of stopping the load.
+- Re-running the same quarter shows "removed 32, added 32" and leaves the
+database as one run did. Running a different quarter shows "removed 0",
+proving the removal is scoped.
+- R1 ties for both extracts: file against table, row count and amount total.
+2026Q3 budget 296,230.92, actual 419,418.50, 32 rows each. First of the four
+reconciliations, and the first time two independently produced figures had
+to agree.
+- Next: M3. Controls C2 to C5 in SQL, the rejects table they write into, and
+the first proper tests.
