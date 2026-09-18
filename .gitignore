@@ -25,3 +25,4 @@ logs/*
 # Scratch files for learning, not part of the pipeline
 scratch.py
 scratch/
+data/variance_duplicates.sqbpro
