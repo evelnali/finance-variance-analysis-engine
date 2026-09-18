@@ -115,3 +115,21 @@ reconciliations, and the first time two independently produced figures had
 to agree.
 - Next: M3. Controls C2 to C5 in SQL, the rejects table they write into, and
 the first proper tests.
+
+
+## 2026-09-18 — M3 started, C2 done
+
+- sql/02_schema_control.sql: control_results (the control log) and exceptions
+  (the exception listing). One exceptions shape serves all of C2–C5.
+- sql/10_control_c2.sql: duplicate key detection — GROUP BY the three key columns,
+  HAVING COUNT(*) > 1.
+- controls.py: runs C2 over both raw tables, writes the log and the exceptions,
+  exits non-zero if anything failed.
+- Decisions: any failed control stops the run, after finishing and writing what
+  it found. Exceptions store the key plus a detail line, never a copy of the row.
+- Proven both ways: PASS on clean data, FAIL on a planted duplicate (CNC-01 CM,
+  4 rows sharing one key), exit code 1.
+- Bugs: TO NULL instead of NOT NULL ×7 in the schema; missing comma in the
+  exceptions column list — which only showed up the first time a control failed,
+  because record_exception is dead code until then; %Y-%m%-%d in the timestamp.
+- Next: C3 — completeness. Every expected asset and period present.
