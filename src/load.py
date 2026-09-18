@@ -2,7 +2,7 @@
 
 Running this twice for the same quarter leaves the database in the same state as running it once:
 the quarter's rows are removed and put back, and no other quarter is touched. That is what lets 
-you reload one quarter at a close withouth disburbing the ones already closed.
+you reload one quarter at a time without disturbing the ones already closed.
 """
 
 import argparse
@@ -14,7 +14,8 @@ from src.config import PROJECT_ROOT, load_settings
 from src.logger import new_run_id, setup_logger
 from src.ingest import read_extract
 
-SCHEMA_PATH = PROJECT_ROOT/"sql"/"01_schema_raw.sql"
+SCHEMA_DIR = PROJECT_ROOT/"sql"            # the folder, not one file.
+SCHEMA_FILES = ["01_schema_raw.sql","02_schema_control.sql"]      #run in this order
 
 # which file goes into which table. 
 RAW_TABLES = {"budget": "raw_budget", "actual": "raw_actual"}
@@ -32,12 +33,14 @@ def create_schema(conn,log):
     The table layouts live in their own .sql file rather than inside Python, so someone can 
     read what the tables look like without reading any code.
 
-    Every line in that file says "if not exists", so running it again on a database that already
-    has the tables does nothing and harms nothing. 
+    Every CREATE in those files says "if not exists", so running them again on a database
+    that already has the tables does nothing and harms nothing.
     """
-    conn.executescript(SCHEMA_PATH.read_text())
+    for name in SCHEMA_FILES:
+        conn.executescript((SCHEMA_DIR/name).read_text())
+        log.info(f"Tables ready, from {name}")
     conn.commit()
-    log.info(f"Table ready, from {SCHEMA_PATH.name}")
+
 
 
 def land_extract(conn,table,rows,period,run_id,log):
@@ -124,7 +127,6 @@ def reconcile_r1(conn,table,file_rows,period,log):
 
 
     return result
-
 
 
 
