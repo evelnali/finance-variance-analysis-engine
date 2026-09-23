@@ -16,6 +16,8 @@ from src.load import connect, RAW_TABLES        # borrowed rather than written t
 SQL_DIR = PROJECT_ROOT/ "sql"
 C2_SQL = SQL_DIR/ "10_control_c2.sql"
 C2_NAME = "Duplicate key detection"
+C3_SQL = SQL_DIR / "10_control_c3.sql"
+C3_NAME = "Completeness"
 
 
 def now_stamp():
@@ -75,6 +77,38 @@ def run_c2(conn,table,period,run_id,log):
     return len(offenders)
 
 
+def run_c3(conn,table, period, run_id,log):
+    """C3 - completeness. Hands back how many expected rows were missing."""
+    query = C3_SQL.read_text().format(table=table)
+    missing = conn.execute(query, (period,)).fetchall()
+
+
+    # The population for a completeness test is what SHOULD be there, not what is. 
+    # Counting the rows that exist would mean a missing row shrinks the population
+    # it was supposed to be found in.
+    rows_tested = conn.execute(
+        """SELECT COUNT(*)
+           FROM ref_assets a
+           JOIN ref_cost_types c ON c.family = a.family"""
+    ).fetchone()[0]
+
+    for asset_id, cost_type in missing: 
+        detail = "in the asset register, but no row in extract"
+        record_exception(conn, run_id, "C3", table,period, asset_id,cost_type,detail)
+
+    status = "FAIL" if missing else "PASS"
+    record_results(conn, run_id,"C3", C3_NAME, table, period,
+                   status, rows_tested, len(missing))
+    conn.commit()
+
+    log.info(f"C3 {table}: {status} - {rows_tested} rows expected, {len(missing)} missing")
+    for asset_id, cost_type in missing: 
+        log.error (f"   {asset_id} {cost_type}: expected but not found")
+
+    return len(missing)
+
+
+
 def parse_args():
     p = argparse.ArgumentParser(description="Run the data-quality controls for one period.")
     p.add_argument("--period", required=True, help="e.g. 2026Q3")
@@ -93,6 +127,7 @@ def main():
     failures = 0
     for table in RAW_TABLES.values():
        failures += run_c2(conn, table, args.period, run_id, log)
+       failures += run_c3(conn, table, args.period, run_id, log)
 
     conn.close()
 

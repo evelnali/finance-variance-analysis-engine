@@ -8,6 +8,7 @@ paths:
   output: data/output
   logs: logs
   database: data/variance.db
+  asset_register: config/asset_register.csv
 
 # Materiality: a variance is flagged only if it breaches BOTH materiality tests.
 #
@@ -38,3 +39,10 @@ extracts:
   actual:
     file: actual.csv
     columns: [period,asset_id,family,cost_type,quantity,uom,amount] 
+
+   
+# Which kinds of cost each family of asset can have. 
+# The generator has always assumed this; now it is  written down where a control can read it. 
+cost_types: 
+  tangible: [PM, CM]
+  intangible: [LICENSE, SUPPORT] 

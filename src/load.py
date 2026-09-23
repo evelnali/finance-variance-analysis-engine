@@ -9,13 +9,14 @@ import argparse
 import sqlite3
 import sys
 from datetime import datetime
+import csv
 
 from src.config import PROJECT_ROOT, load_settings
 from src.logger import new_run_id, setup_logger
 from src.ingest import read_extract
 
 SCHEMA_DIR = PROJECT_ROOT/"sql"            # the folder, not one file.
-SCHEMA_FILES = ["01_schema_raw.sql","02_schema_control.sql"]      #run in this order
+SCHEMA_FILES = ["01_schema_raw.sql","02_schema_control.sql","03_schema_reference.sql"]      #run in this order
 
 # which file goes into which table. 
 RAW_TABLES = {"budget": "raw_budget", "actual": "raw_actual"}
@@ -138,6 +139,50 @@ def parse_arg():
     return parser.parse_args()
 
 
+def land_reference(conn, settings, run_id, log):
+    """Rebuild both reference tables from config.
+    
+    No period involved: these are replaced in whole every run, not one quarter at a time,
+    because they describe what exists rather than what happened in a quarter.
+    """
+    stamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # -- the assset master file, straight from the register file ------------
+    register_path = PROJECT_ROOT / settings["paths"]["asset_register"]
+    with open(register_path, newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))            # each line become a dict, keyed by the headings
+
+    conn.execute("DELETE FROM ref_assets")     # no WHERE - the hwole table gose
+    for r in rows: 
+        conn.execute(
+            """INSERT INTO ref_assets
+            (asset_id, family, asset_class, acquired_year, replacement_cycle_years, capitalized_cost,
+            seats, runs_on, notes, run_id, loaded_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?)""",            # 11 fields, 11 values. 
+            (r["asset_id"], r["family"], r["asset_class"],r["acquired_year"],r["replacement_cycle_years"],
+             r["capitalized_cost"], r["seats"], r["runs_on"], r["notes"],run_id,stamp),
+        )
+
+
+    #  -------------- the cost type rule, from settings. -------------------
+    conn.execute("DELETE FROM ref_cost_types")
+    pairs = 0
+    for family, kinds in settings["cost_types"].items():      # "tangible" --> ["PM", "CM"]
+        for cost_type in kinds:
+            conn.execute(
+                "INSERT INTO ref_cost_types (family, cost_type, run_id, loaded_at) VALUES (?,?,?,?)",
+                (family, cost_type, run_id, stamp),
+            )
+            pairs += 1
+
+
+    conn.commit()
+    log.info(f"Reference rebuilt: {len(rows)} assets, {pairs} family/cost type pairs")
+
+
+
+
+
 def main():
     """Read both files, check them, and load one quarter. """
     args = parse_arg()
@@ -149,6 +194,7 @@ def main():
 
     conn = connect(settings)
     create_schema(conn,log)
+    land_reference(conn,settings,run_id,log)   # new: reference tables before the extracts
 
     results = []
 

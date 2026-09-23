@@ -133,3 +133,19 @@ the first proper tests.
   exceptions column list — which only showed up the first time a control failed,
   because record_exception is dead code until then; %Y-%m%-%d in the timestamp.
 - Next: C3 — completeness. Every expected asset and period present.
+
+
+## 2026-09-22 — M3, C3 completeness
+
+- ref_assets and ref_cost_types: reference data, rebuilt from config every run.
+  Master data, not transactions — hence the ref_ prefix, not raw_.
+- The tangible/intangible → cost type rule was implicit in the generator; now it
+  is written down in settings.yml where a control can read it.
+- 10_control_c3.sql: builds the 32 expected pairs from the two reference tables,
+  LEFT JOINs to the extract, keeps the ones that found nothing.
+- rows_tested for C3 is what SHOULD exist, not what does — otherwise a missing
+  row shrinks its own population.
+- Seen failing: SAW-03 PM deleted → C3 FAIL, C2 still PASS. Completeness needs an
+  independent source; nothing inside the data can reveal a row that never arrived.
+- Bugs: plurals (EXIST, VALUE, ref_cost_type), trailing comma before ), NO NULL again.
+- Next: C4 mapping coverage, C5 reasonability, then the first tests.

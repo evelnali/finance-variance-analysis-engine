@@ -20,6 +20,8 @@ REQUIRED_KEYS = [
     ("materiality","intangible","absolute_threshold"),   
     ("materiality","intangible","percent_threshold"),
     ("extracts",),
+    ("paths", "asset_register"),
+    ("cost_types",),
 ]
 
 
