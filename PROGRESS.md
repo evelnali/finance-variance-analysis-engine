@@ -149,3 +149,19 @@ the first proper tests.
   independent source; nothing inside the data can reveal a row that never arrived.
 - Bugs: plurals (EXIST, VALUE, ref_cost_type), trailing comma before ), NO NULL again.
 - Next: C4 mapping coverage, C5 reasonability, then the first tests.
+
+
+
+## 2026-09-24 — M3, C4 mapping coverage
+
+- 10_control_c4.sql: C3's query with the sides swapped. Keeps every DATA row and
+  looks for ones the register never matched — an unknown asset, or a known asset
+  carrying a cost type its family can't have.
+- Learned: a condition about the RIGHT table goes in ON; about the LEFT table it
+  goes in WHERE. In WHERE it would discard the unmatched rows, which are the only
+  ones a LEFT JOIN exists to keep.
+- rows_tested is what exists here, not what's expected — C4 tests the data.
+- Seen failing: a planted MILL-03 row, caught by C4 while C2 and C3 stayed green.
+- Pre-flight for query files: run the .sql against data/variance.db before the
+  pipeline. Names the bad word in two seconds instead of a traceback.
+- Next: C5 reasonability, then the first tests.

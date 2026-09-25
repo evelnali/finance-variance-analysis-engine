@@ -20,6 +20,9 @@ C3_SQL = SQL_DIR / "10_control_c3.sql"
 C3_NAME = "Completeness"
 C4_SQL = SQL_DIR/"10_control_c4.sql"
 C4_NAME = "Mapping coverage"
+C5_SQL = SQL_DIR / "10_control_c5.sql"
+C5_NAME = "Reasonability"
+
 
 
 def now_stamp():
@@ -136,6 +139,27 @@ def run_c4(conn, table, period, run_id, log):
     return len(unknown)
 
 
+def run_c5(conn, table, period, run_id, log):
+    """C5 - data reasonability. Hands back how many rows are impossible."""
+    query = C5_SQL.read_text().format(table=table)
+    bad = conn.execute(query, (period,)).fetchall()
+
+    rows_tested = conn.execute(
+        f"SELECT COUNT(*) FROM {table} WHERE period = ?", (period,)
+    ).fetchone()[0]
+
+    status = "FAIL" if bad else "PASS"
+    record_results(conn, run_id, "C5", C5_NAME,table,period, status, rows_tested, len(bad))
+    conn.commit()
+
+    log.info(f"C5 {table}: {status} - {rows_tested} rows tested, {len(bad)} unresonable")
+    for asset_id, cost_type, quantity, amount, reason in bad:
+        log.error(f"    {asset_id} {cost_type}: {reason} (quantity {quantity}, amount {amount})")
+
+    return len(bad)
+
+
+
 
 def parse_args():
     p = argparse.ArgumentParser(description="Run the data-quality controls for one period.")
@@ -157,6 +181,7 @@ def main():
        failures += run_c2(conn, table, args.period, run_id, log)
        failures += run_c3(conn, table, args.period, run_id, log)
        failures += run_c4(conn, table, args.period, run_id, log)
+       failures += run_c5(conn, table, args.period, run_id, log)
 
     conn.close()
 
