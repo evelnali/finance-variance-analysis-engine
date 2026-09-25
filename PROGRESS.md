@@ -165,3 +165,22 @@ the first proper tests.
 - Pre-flight for query files: run the .sql against data/variance.db before the
   pipeline. Names the bad word in two seconds instead of a traceback.
 - Next: C5 reasonability, then the first tests.
+
+
+
+## 2026-09-25 — M3, C5 reasonability. All four controls built.
+
+- 10_control_c5.sql: quantity and amount must AGREE about whether anything
+  happened. Not "neither may be zero" — that version would flag SAW-04 CM in
+  2026Q3, which legitimately has zero work orders and zero cost, and would halt
+  a clean run every time under the stop-on-failure rule.
+- Uses CASE WHEN to report WHY each row failed, so the exception listing reads
+  on its own: "cost with no work behind it (quantity 0.0, amount 7000.0)".
+- CAST(... AS REAL) throughout — the raw layer is text, and text compares
+  character by character, so '10' would sort before '9'.
+- Negatives are flagged outright. A real ERP would exempt credit notes by
+  document type; nothing here produces one, so no untested exemption was added.
+- Seen failing: CNC-01 PM quantity zeroed with its $7,000 left in place.
+  C2, C3 and C4 all stayed green — the row is unique, present and refers to a
+  real machine. It is simply impossible.
+- Next: the first pytest tests, then R1 and C1 results into control_results.
