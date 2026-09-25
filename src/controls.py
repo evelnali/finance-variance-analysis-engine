@@ -18,6 +18,8 @@ C2_SQL = SQL_DIR/ "10_control_c2.sql"
 C2_NAME = "Duplicate key detection"
 C3_SQL = SQL_DIR / "10_control_c3.sql"
 C3_NAME = "Completeness"
+C4_SQL = SQL_DIR/"10_control_c4.sql"
+C4_NAME = "Mapping coverage"
 
 
 def now_stamp():
@@ -109,6 +111,32 @@ def run_c3(conn,table, period, run_id,log):
 
 
 
+def run_c4(conn, table, period, run_id, log):
+    """C4 - mapping coverage. Hands back how many rows referred to something unknown."""
+    query = C4_SQL.read_text().format(table=table)
+    unknown = conn.execute(query, (period,)).fetchall()
+
+    # Population here is what IS THERE - C4 tests the data, not the expectation. 
+    row_tested = conn.execute(
+        f"SELECT COUNT(*) FROM {table} WHERE period = ?", (period,)
+    ).fetchone()[0]
+
+    for asset_id, cost_type in unknown:
+        detail = "no matching asset and cost type in the register"
+        record_exception(conn,run_id,"C4", table,period, asset_id,cost_type,detail)
+
+    status = "FAIL" if unknown else "PASS"
+    record_results(conn, run_id, "C4", C4_NAME, table, period, status, row_tested, len(unknown))
+    conn.commit() 
+
+    log.info(f"C4 {table}: {status} - {row_tested} rows tested, {len(unknown)} unrecognised")
+    for asset_id, cost_type in unknown:
+        log.error(f"    {asset_id} {cost_type}: not in the register")
+
+    return len(unknown)
+
+
+
 def parse_args():
     p = argparse.ArgumentParser(description="Run the data-quality controls for one period.")
     p.add_argument("--period", required=True, help="e.g. 2026Q3")
@@ -128,6 +156,7 @@ def main():
     for table in RAW_TABLES.values():
        failures += run_c2(conn, table, args.period, run_id, log)
        failures += run_c3(conn, table, args.period, run_id, log)
+       failures += run_c4(conn, table, args.period, run_id, log)
 
     conn.close()
 
