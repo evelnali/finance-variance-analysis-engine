@@ -202,3 +202,37 @@ the first proper tests.
 M3 done: C2–C5 built, each seen failing, first tests green.
 Next: M4 — the curated layer. Plus two tidies: R1 and C1 results into
 control_results.
+
+
+## 2026-09-30 — C1 and R1 into the control log. M4 begins.
+
+- src/results.py: record_results and record_exception moved out of controls.py,
+  because load.py needs them too. Two files needing the same thing is what
+  earns that thing its own file — and importing controls.py from load.py
+  would have been circular, each needing the other before either finished.
+- control_results gained a detail column, so a check records the figures it
+  tied when it passes, not only when it fails. DEFAULT '' so every call
+  written before the column existed still works.
+- C1 and R1 now write to control_results like C2–C5. C1's period is "ALL" —
+  it reads the whole file, every quarter in it, not one quarter.
+- Committed C1's line BEFORE the sys.exit on failure. A control log that
+  only records passes proves nothing.
+- All eight quarters loaded: 256 rows per raw table, R1 tied all 16
+  file-to-table pairs.
+- Found: idx_raw_actual_period was pointing at raw_budget. Harmless today,
+  and the kind of copy-paste slip that gets inherited quietly.
+- M4 file 1: sql/04_schema_curated.sql. dim_period, dim_asset, dim_cost_type,
+  fact_expense.
+- "fact_spend" renamed to "fact_expense" before anything was built. Expense is
+  the accounting word and none of this is capitalized.
+- PRIMARY KEY on fact_expense is C2 done as a preventive control — the door
+  refuses the duplicate, instead of a test finding it afterwards. C2 still
+  runs on raw, where there is no key and duplicates can land.
+- Foreign keys are declared AND switched on with PRAGMA foreign_keys = ON.
+  Declared but not switched on, they would be decoration — the NO NULL trap.
+- Trap: the file parsed clean and printed OK while dim_cost_type was missing
+  entirely. SQLite accepts a foreign key pointing at a table that does not
+  exist; it only looks for it when a row is inserted. "No errors" is not
+  "it built what I meant" — count the tables, don't trust the silence.
+
+Next: M4 files 2–9. Build the four curated tables, then R2.
