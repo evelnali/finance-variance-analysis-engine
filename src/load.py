@@ -14,9 +14,10 @@ import csv
 from src.config import PROJECT_ROOT, load_settings
 from src.logger import new_run_id, setup_logger
 from src.ingest import read_extract
+from src.results import record_results
 
 SCHEMA_DIR = PROJECT_ROOT/"sql"            # the folder, not one file.
-SCHEMA_FILES = ["01_schema_raw.sql","02_schema_control.sql","03_schema_reference.sql"]      #run in this order
+SCHEMA_FILES = ["01_schema_raw.sql","02_schema_control.sql","03_schema_reference.sql","04_schema_curated.sql"]      #run in this order
 
 # which file goes into which table. 
 RAW_TABLES = {"budget": "raw_budget", "actual": "raw_actual"}
@@ -202,13 +203,37 @@ def main():
         # Control c1 runs first. A file that fails its column check never reaches the database at all. 
         rows,result = read_extract(name,settings,log)
 
+        # C1's line goes in whether it passed or failed. A log that only records passess
+        # proves nothing -- failure is the one line an auditor wants to see. 
+        # period is "ALL": C1 read the whole file, every quarter in it, not one quarter .
+        # target_table is the table this file feeds, so the solumn always holds a real table name.
+        record_results(
+            conn, run_id, "C1","Schema confirmance", table, "ALL",
+            result["status"], len(rows),
+            0 if result["status"] == "PASS" else 1,
+            result["detail"],         # "256 rows, 7 columns", or what was wrong
+        )
+        conn.commit()            # saved now, so the line survives the exit below
+
         if result["status"] == "FAIL":
             log.error(f"{name} failed C1. Nothing was loaded.")
             conn.close()
             sys.exit(1)
 
         landed = land_extract(conn,table,rows,args.period,run_id,log)
-        results.append(reconcile_r1(conn,table,landed,args.period,log))
+
+        r1 = reconcile_r1(conn, table, landed, args.period, log)
+        results.append(r1)
+
+        # R1's line. rows_tested is this quarter's rows -- the ones R1 actually tied, 
+        # not the whole file. Each control counts what it looked at. 
+        record_results(
+            conn, run_id, "R1","File to raw reconciliation", table, args.period,
+            r1["status"], len(landed),
+            0 if r1["status"] == "PASS" else 1,
+            r1["detail"],             # "file 32 rows/296,230.92  vs.  table 32 rows / ...... "
+         )
+        conn.commit()
 
     conn.close()
 

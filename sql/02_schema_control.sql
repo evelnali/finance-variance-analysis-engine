@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS control_results(
     status      TEXT NOT NULL,    -- PASS or FAIL
     rows_tested   INTEGER NOT NULL,    -- how many rows the test covered
     exceptions_found      INTEGER NOT NULL,    -- 0 when it passed
+    detail            TEXT NOT NULL DEFAULT '',        -- the figures a check tied, or why it failed
     checked_at        TEXT NOT NULL         -- when the test run
 );
 

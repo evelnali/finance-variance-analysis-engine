@@ -44,4 +44,4 @@ CREATE TABLE IF NOT EXISTS raw_actual(
 -- finding one quarter's row statys quick as the table grows. Same idea as sorting 
 -- a spreadsheet column before you start looking things up in it. 
 CREATE INDEX IF NOT EXISTS idx_raw_budget_period ON raw_budget(period);
-CREATE INDEX IF NOT EXISTS idx_raw_actual_period ON raw_budget(period);
+CREATE INDEX IF NOT EXISTS idx_raw_actual_period ON raw_actual(period);

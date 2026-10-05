@@ -7,11 +7,12 @@ every item it objected to.
 
 import argparse
 import sys
-from datetime import datetime
 
 from src.config import PROJECT_ROOT, load_settings
 from src.logger import new_run_id,setup_logger
 from src.load import connect, RAW_TABLES        # borrowed rather than written twice
+from src.results import record_results,record_exception
+
 
 SQL_DIR = PROJECT_ROOT/ "sql"
 C2_SQL = SQL_DIR/ "10_control_c2.sql"
@@ -23,34 +24,6 @@ C4_NAME = "Mapping coverage"
 C5_SQL = SQL_DIR / "10_control_c5.sql"
 C5_NAME = "Reasonability"
 
-
-
-def now_stamp():
-    """The time as text, in the same shape as loaded_at"""
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-
-def record_results(conn,run_id,control_id,control_name,table,period,status,rows_tested,
-                   exceptions_found):
-    """Write one line into the control log."""
-    conn.execute(
-        """INSERT INTO control_results
-        (run_id, control_id, control_name,target_table,period,status,rows_tested,exceptions_found,checked_at)
-        VALUES(?,?,?,?,?,?,?,?,?)""" ,       # nine blanks, nine value below
-        (run_id,control_id,control_name,table,period,status,rows_tested,exceptions_found,now_stamp()),
-    )
-
-
-def record_exception(conn,run_id,control_id,table,period,
-                     asset_id, cost_type,detail):
-    """Write one line into the exception listing."""
-    conn.execute(
-        """INSERT INTO exceptions
-        (run_id,control_id,target_table,period,asset_id, 
-        cost_type,detail,found_at)
-        VALUES (?,?,?,?,?,?,?,?)""" ,    #eight blanks, eight values below
-        (run_id, control_id, table,period, asset_id,cost_type,detail,now_stamp()),
-    )
 
 
 def run_c2(conn,table,period,run_id,log):

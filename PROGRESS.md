@@ -184,3 +184,21 @@ the first proper tests.
   C2, C3 and C4 all stayed green — the row is unique, present and refers to a
   real machine. It is simply impossible.
 - Next: the first pytest tests, then R1 and C1 results into control_results.
+
+## 2026-09-25 (later) — M3 complete. First tests.
+
+- tests/test_anomaly_rules.py: five tests on rule_matches. The asset test is the
+  one that would have caught the .get("asseets") bug the moment it was typed.
+- tests/test_control_c5.py: seven tests, run against a six-row database built in
+  memory and thrown away. Nothing touches data/variance.db.
+- test_nothing_else_is_flagged pins the count at 3 — without it C5 could start
+  flagging everything and the other tests would all still pass.
+- Two of my own tests were wrong before the code was: ROUTER-1 missing a zero,
+  and a missing "not". A red test means the code OR the test is wrong. A test
+  that passes for the wrong reason is the expensive kind.
+- ("2026Q3") with no comma is not a tuple — sqlite3 read the six characters as
+  six values. Same trap as ("extracts",) in config.py.
+
+M3 done: C2–C5 built, each seen failing, first tests green.
+Next: M4 — the curated layer. Plus two tidies: R1 and C1 results into
+control_results.
