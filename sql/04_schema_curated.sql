@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS dim_asset(
     asset_id           TEXT PRIMARY KEY,        -- 'CNC-01'
     family             TEXT NOT NULL,           -- tangible / intangible
     asset_class        TEXT NOT NULL,           -- "CNC_MACHINING_CENTRE"
-    aquired_year       INTEGER NOT NULL,
+    acquired_year       INTEGER NOT NULL,
     replacement_cycle_years     INTEGER,             -- blank for software
     capitalized_cost          REAL NOT NULL,
     seats                     INTEGER,
