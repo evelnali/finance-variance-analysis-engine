@@ -28,8 +28,8 @@ FROM (
     -- UNION stacks two lists on top of each other AND drops the duplicates. 
     -- Both tables hold all eight quarters, so this gives eight rows, not sixteen.
     -- UNION ALL would keep all sixteen rows : a different word for a different job.
-    SELECT period FROM row_budget
+    SELECT period FROM raw_budget
     UNION
-    SELECT period FROM row_actual
+    SELECT period FROM raw_actual
 )
 ORDER BY period; 
