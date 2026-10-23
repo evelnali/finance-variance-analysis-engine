@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS dim_period(
 
 
 
--- ------------------------------------deim_asset--------------------------------------------
+-- ------------------------------------dim_asset--------------------------------------------
 -- One row per asset. The asset register, with the text turned into numbers. 
 -- 
 -- The blanks stay blank. A machine has no seats; software has no replacement cycle.
