@@ -236,3 +236,30 @@ control_results.
   "it built what I meant" — count the tables, don't trust the silence.
 
 Next: M4 files 2–9. Build the four curated tables, then R2.
+
+
+
+## 2026-10-23 to 2026-11-16 — M4: the curated layer builds and ties
+
+- Four build files (sql/20–23) fill dim_period, dim_asset, dim_cost_type and
+  fact_expense. sql/24_control_r2.sql lines raw up against curated.
+- src/curate.py runs them on the real database: empties the four tables
+  (expense table first, because of the foreign keys), rebuilds them, runs R2,
+  and saves once at the end. If a table rule refuses a row or R2 does not tie,
+  the build is undone and the database stays as it was.
+- First real run: 8 quarters, 16 assets, 4 cost types, 512 expense rows.
+  R2 PASS: budget 2,314,551.36 and actual 2,760,090.95 on both sides.
+- NULLIF(column, '') on every column before CAST. CAST('' AS INTEGER) gives 0
+  with no error, which would have recorded machines with 0 seats.
+- INSERT and SELECT lists match by position, not by name. I had seats and
+  capitalized_cost swapped; the build stopped only because of a NOT NULL rule.
+- A preview is not a test of the file. sql/20 was committed on a clean preview
+  with row_budget in it. From then on, every file was run on a copy first.
+- aquired_year sat misspelled in the schema for three weeks. .tables shows
+  table names, not columns. CREATE TABLE IF NOT EXISTS will not fix an
+  existing table; it needs DROP TABLE first.
+- First curate run failed on a wrong file name, after the four builds had run.
+  Nothing was saved, because the commit had not been reached.
+- Known gap: CAST('n/a' AS REAL) gives 0.0 silently. Needs its own test.
+
+Next: tests/test_curate.py, then docs/data_dictionary.md, then M5.
