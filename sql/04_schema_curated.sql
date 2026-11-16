@@ -34,7 +34,7 @@
 -- M5 needs to ask "did this also happen the quarter before", and this is what let it. 
 -- Same idea as a searial period number in a GL calendar. 
 CREATE TABLE IF NOT EXISTS dim_period(
-    period       TEXT PRIMARY KEY,      -- '2026Q3', the form files use
+    period       TEXT PRIMARY KEY NOT NULL,      -- '2026Q3', the form files use
     year         INTEGER NOT NULL,      -- 2026
     quarter      INTEGER NOT NULL,      -- 3
     period_seq   INTEGER NOT NULL,      -- 8017 (2026*4 + 3)
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS dim_period(
 -- No asset_age column on pupose. Age changes every Janurary, and a stored copy would quietly go wrong. 
 -- It gets worked out when needed, from acquired_year, which never changes.
 CREATE TABLE IF NOT EXISTS dim_asset(
-    asset_id           TEXT PRIMARY KEY,        -- 'CNC-01'
+    asset_id           TEXT PRIMARY KEY NOT NULL,        -- 'CNC-01'
     family             TEXT NOT NULL,           -- tangible / intangible
     asset_class        TEXT NOT NULL,           -- "CNC_MACHINING_CENTRE"
     acquired_year       INTEGER NOT NULL,
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS dim_asset(
 -- for one of them to disagree with others. 
 -- The build proves there is exactly one uom per cost type before writing it. 
 CREATE TABLE IF NOT EXISTS dim_cost_type(
-    cost_type          TEXT PRIMARY KEY,            --  PM / CM / LICENSE / SUPPORT
+    cost_type          TEXT PRIMARY KEY NOT NULL,            --  PM / CM / LICENSE / SUPPORT
     family             TEXT NOT NULL,           -- which family of asset is applies to
     uom               TEXT NOT NULL,           -- WORK_ORDER / SEAT/ INCIDENT
     run_id            TEXT NOT NULL, 

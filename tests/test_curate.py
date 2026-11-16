@@ -139,6 +139,15 @@ def test_a_blank_capitalized_cost_stops_the_build():
         build_curated(conn, "t", LOG)
 
 
+def test_a_register_line_with_no_asset_id_stops_the_build():
+    # SQLite lets a text primary key be empty unless the column also says NOT NULL.
+    conn = tiny_database()
+    spoil(conn, """INSERT INTO ref_assets VALUES
+                   ('', 'tangible', 'COPY_ROUTER', '2019', '8', '65000', '', '', '', 't', 't')""")
+    with pytest.raises(sqlite3.IntegrityError):
+        build_curated(conn, "t", LOG)
+
+
 def test_one_cost_type_with_two_units_stops_the_build():
     conn = tiny_database()
     spoil(conn, "UPDATE raw_actual SET uom = 'HOURS' WHERE rowid = 1")
