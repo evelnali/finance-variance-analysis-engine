@@ -123,45 +123,57 @@ def record_r2(conn, run_id, result):
                    result["status"], result["row_tested"],len(result["differ"]), result["detail"])
 
 
+
+def curate(conn, run_id, log):
+    """Build, reconcile and save, as one unit. Hands back "PASS", "FAIL" or "STOPPED".
+
+    The connection comes in as an input rather than being opened here, so a test
+    can hand this function a small throwaway database instead of the real one.
+    """
+    switch_on_foreign_keys(conn)
+
+    # ------ build. A row the table rules refuse stops it here. --------
+    try:
+        build_curated(conn, run_id, log)
+    except sqlite3.IntegrityError as problem:
+        conn.rollback()              # undo everything since the run started.
+        log.error(f"Build stopped: {problem}")
+        log.error("Nothing was saved. The curated tables are as they were before this run.")
+        return "STOPPED"
+
+    # ------ reconcile. R2 reads the new build before it is saved. --------
+    result = reconcile_r2(conn, log)
+
+    if result["status"] == "FAIL":
+        conn.rollback()              # a build that does not tie is not saved.
+
+    # The R2 line is written either way. On a PASS this one commit saves the build
+    # and the line together. On a FAIL the build is already undone, so it saves
+    # only the record of the failure.
+    record_r2(conn, run_id, result)
+    conn.commit()
+
+    return result["status"]
+
+
 def main():
-    """Rebuild the curated layer and tie it back to the raw. """
+    """Rebuild the curated layer in the real database and tie it back to raw."""
     run_id = new_run_id()
     log = setup_logger(run_id)
     settings = load_settings()
 
     log.info("Curated build started.")
     conn = connect(settings)
-    switch_on_foreign_keys(conn)
-
-    # ------ build. A row the table refuse stops it here. --------
-    try:
-        build_curated(conn,run_id, log)
-    except sqlite3.IntegrityError as problem:
-        conn.rollback()              # undo everything since the run started.
-        log.error(f"Build stopped: {problem}")
-        log.error("Nothing was saved. The curated tables are as they were before this run.")
-        conn.close()
-        sys.exit(1)
-
-    # ------ reconcile. R2 reads the new build before it is saved. --------
-    result = reconcile_r2(conn, log)
-
-    if result["status"] == "FAIL":
-        conn.rollback()              # a build that does not tie is not saved. 
-
-    # The R2 line is written either way. On a PASS this one commit saves the build
-    # and the line together. On a FAIL the build is already undone, so it saves
-    # only the record of the failure. 
-    record_r2(conn, run_id, result)
-    conn.commit()
+    outcome = curate(conn, run_id, log)
     conn.close()
 
-    if result["status"] == "FAIL":
-       log.error("Curate failed. The build was undone; the failure is in the control log.")
-       sys.exit(1)
+    if outcome == "FAIL":
+        log.error("Curate failed. The build was undone; the failure is in the control log.")
+    if outcome != "PASS":
+        sys.exit(1)              # STOPPED has already logged its reason
 
     log.info("Curate finished. The curated layer tied to raw.")
-    
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     main()
