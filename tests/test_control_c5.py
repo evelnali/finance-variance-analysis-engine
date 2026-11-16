@@ -24,7 +24,7 @@ def tiny_database():
         quantity TEXT, uom TEXT, amount TEXT, run_id TEXT, loaded_at TEXT)""")
     rows = [
         ("2026Q3", "SAW-04", "tangible", "CM", "0.0", "WORK_ORDER", "0.0",    "t", "t"),   #ok
-        ("2026Q3", "CNC-1", "tangible", "PM", "2.0", "WORK_ORDER", "7000.0", "t","t"), #ok
+        ("2026Q3", "CNC-01", "tangible", "PM", "2.0", "WORK_ORDER", "7000.0", "t","t"), #ok
         ("2026Q3", "SAW-CADCAM", "intangible", "LICENSE", "6.0", "SEAT", "3800.0", "t", "t"),  #ok
         ("2026Q3", "CNC-02", "tangible", "PM", "0.0", "WORK_ORDER", "5000.0", "t", "t"),    # has cost, but no work
         ("2026Q3", "CNC-03", "tangible","PM", "2.0", "WORK_ORDER", "0.0", "t","t"),      # has work, but no cost
