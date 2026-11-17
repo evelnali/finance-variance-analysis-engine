@@ -177,9 +177,19 @@ def land_reference(conn, settings, run_id, log):
             pairs += 1
 
 
-    conn.commit()
-    log.info(f"Reference rebuilt: {len(rows)} assets, {pairs} family/cost type pairs")
+    # -------------- the materiality thresholds, from settings. -------------------
+    conn.execute("DELETE FROM ref_materiality")                # empty the table first, so a second run cannot add the rows twice
+    for family, limits in settings["materiality"].items():     # walks the two families in settings.yml, one at a time
+        conn.execute(
+            """INSERT INTO ref_materiality
+            (family, absolute_threshold, percent_threshold, run_id, loaded_at)
+            VALUES (?,?,?,?,?)""",                             # 5 fields, 5 values.
+            (family, limits["absolute_threshold"], limits["percent_threshold"], run_id, stamp),
+        )
 
+    conn.commit()
+    log.info(f"Reference rebuilt: {len(rows)} assets, {pairs} family/cost type pairs, "
+             f"{len(settings['materiality'])} materiality thresholds")
 
 
 
