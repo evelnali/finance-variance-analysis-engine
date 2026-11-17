@@ -282,3 +282,27 @@ Next: tests/test_curate.py, then docs/data_dictionary.md, then M5.
   8 control runs, 1 curate. 97 control lines, none failed.
 
 Next: M5 — the variance views.
+
+
+
+## 2026-11-17 — M5 complete
+
+- Scope kept simple: variance at asset class level, split into volume and
+  price. Mix and the direction test moved to the reserve list.
+- Naming: saved queries are query_varn_*. varn is how finance writes variance.
+- ref_materiality: thresholds moved from settings.yml into a table, so a
+  query can read them. 25,000 tangible, 3,000 intangible, both 5%.
+- Three saved queries (SQL views), each built on the one before:
+  query_varn_by_asset, query_varn_price_volume, query_varn_by_class.
+- R3: nine checks tie the saved queries back to fact_expense.
+- src/analyze.py creates the queries, runs R3 and records the result.
+- tests/test_analyze.py: 18 tests. Shared test database moved to
+  tests/tiny_db.py. Suite is now 48.
+- Saw two tests fail on purpose: AND changed to OR in the material test.
+- Check figures: variance 445,539.59 = volume 390,169.84 + price 55,369.75.
+  13 of 128 class lines are material, all corrective maintenance.
+- Written down, not fixed: what gets flagged depends on the level tested.
+  No software line and no 2025Q4 servicing line reaches its threshold.
+
+Next: M6 — the Excel workbook, R4, and the README.
+
