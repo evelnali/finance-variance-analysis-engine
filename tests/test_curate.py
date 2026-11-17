@@ -12,71 +12,12 @@ every actual row is 150.00.
     8 actual rows x 150.00 = 1,200.00
 """
 
-import logging
 import sqlite3
 
 import pytest
 
-from src.config import PROJECT_ROOT
-from src.curate import (build_curated, reconcile_r2, record_r2, curate,
-                        switch_on_foreign_keys)
-
-SQL_DIR = PROJECT_ROOT / "sql"
-SCHEMA_FILES = ["01_schema_raw.sql", "02_schema_control.sql",
-                "03_schema_reference.sql", "04_schema_curated.sql"]
-
-LOG = logging.getLogger("test_curate")       # somewhere for the log lines to go
-
-
-def tiny_database():
-    """A complete small database: real table layouts, sixteen raw rows."""
-    conn = sqlite3.connect(":memory:")       # lives in memory only, gone when the test ends
-
-    # The real layouts, so a test can never drift away from the real tables.
-    for name in SCHEMA_FILES:
-        conn.executescript((SQL_DIR / name).read_text())
-
-    # The asset register, as text, blanks as '' - the way load.py lands it.
-    conn.executemany("INSERT INTO ref_assets VALUES (?,?,?,?,?,?,?,?,?,?,?)", [
-        # asset_id     family        class                   year    cycle  cost      seats runs_on notes
-        ("CNC-01",    "tangible",   "CNC_MACHINING_CENTRE", "2010", "12",  "350000", "",   "",     "", "t", "t"),
-        ("SW-CADCAM", "intangible", "CAD_CAM_SUITE",        "2015", "",    "140000", "6",  "",     "", "t", "t"),
-    ])
-
-    conn.executemany("INSERT INTO ref_cost_types VALUES (?,?,?,?)", [
-        ("tangible", "PM", "t", "t"), ("tangible", "CM", "t", "t"),
-        ("intangible", "LICENSE", "t", "t"), ("intangible", "SUPPORT", "t", "t"),
-    ])
-
-    # Two quarters either side of a year end, so the quarter numbering is tested there.
-    for table, amount in [("raw_budget", "100.00"), ("raw_actual", "150.00")]:
-        for period in ["2025Q4", "2026Q1"]:
-            conn.executemany(f"INSERT INTO {table} VALUES (?,?,?,?,?,?,?,?,?)", [
-                (period, "CNC-01",    "tangible",   "PM",      "2.0", "WORK_ORDER", amount, "t", "t"),
-                (period, "CNC-01",    "tangible",   "CM",      "1.0", "WORK_ORDER", amount, "t", "t"),
-                (period, "SW-CADCAM", "intangible", "LICENSE", "6.0", "SEAT",       amount, "t", "t"),
-                (period, "SW-CADCAM", "intangible", "SUPPORT", "1.0", "INCIDENT",   amount, "t", "t"),
-            ])
-
-    conn.commit()
-    switch_on_foreign_keys(conn)
-    return conn
-
-
-def spoil(conn, sql):
-    """Damage the tiny database on purpose, and save the damage.
-
-    Saved straight away so that it is part of the starting point. Otherwise the
-    undo inside curate() would undo the damage as well.
-    """
-    conn.execute(sql)
-    conn.commit()
-
-
-def count(conn, table):
-    """How many rows a table holds."""
-    return conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-
+from src.curate import build_curated, reconcile_r2, record_r2, curate
+from tiny_db import tiny_database, spoil, count, LOG      # the shared throwaway database
 
 # ---------------------------------------------------------------- a clean build
 
