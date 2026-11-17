@@ -263,3 +263,22 @@ Next: M4 files 2–9. Build the four curated tables, then R2.
 - Known gap: CAST('n/a' AS REAL) gives 0.0 silently. Needs its own test.
 
 Next: tests/test_curate.py, then docs/data_dictionary.md, then M5.
+
+## 2026-11-16 — M4 complete
+
+- tests/test_curate.py: 18 tests on a small in-memory database built from the
+  real schema and build files. Suite is now 30.
+- curate() split out of main() so a test can hand it a throwaway database.
+- Saw a test fail on purpose: UNION ALL changed to UNION let a duplicated row
+  through with no error, and only one test noticed.
+- Found by a test that could never fail: test_control_c5.py checked CNC-01
+  while its data said CNC-1.
+- Found while writing the data dictionary: SQLite allows an empty text
+  primary key unless the column says NOT NULL. A register line with a blank
+  asset ID built and passed R2. Wrote the failing test first, then fixed
+  three lines of the schema.
+- docs/data_dictionary.md: every curated table and column.
+- Done-test: database moved aside and rebuilt from the extracts. 8 loads,
+  8 control runs, 1 curate. 97 control lines, none failed.
+
+Next: M5 — the variance views.
