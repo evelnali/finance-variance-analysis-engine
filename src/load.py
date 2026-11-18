@@ -110,7 +110,7 @@ def reconcile_r1(conn,table,file_rows,period,log):
 
     #Two totals that reached here by different routes are almost never identical to the last decimal place,
     # so agree within a cent instead of asking for an exact match. 
-    matched = file_count == db_count and abs(file_total - db_total) < 0.1
+    matched = file_count == db_count and abs(file_total - db_total) < 0.01
 
     result = {
         "control_id": "R1",
@@ -192,21 +192,12 @@ def land_reference(conn, settings, run_id, log):
              f"{len(settings['materiality'])} materiality thresholds")
 
 
+def load(conn, settings, period, run_id, log):
+    """Check both files and load one quarter. Hands back "PASS" or "FAIL".
 
-
-def main():
-    """Read both files, check them, and load one quarter. """
-    args = parse_arg()
-    run_id = new_run_id()
-    log = setup_logger(run_id)
-    settings = load_settings()
-
-    log.info(f"Load started for {args.period}.")
-
-    conn = connect(settings)
-    create_schema(conn,log)
-    land_reference(conn,settings,run_id,log)   # new: reference tables before the extracts
-
+    The connection and the run number come in as inputs, so run.py can use one
+    connection and one run number for the whole pipeline.
+    """
     results = []
 
     for name,table in RAW_TABLES.items():
@@ -218,7 +209,7 @@ def main():
         # period is "ALL": C1 read the whole file, every quarter in it, not one quarter .
         # target_table is the table this file feeds, so the solumn always holds a real table name.
         record_results(
-            conn, run_id, "C1","Schema confirmance", table, "ALL",
+            conn, run_id, "C1","Schema conformance", table, "ALL",
             result["status"], len(rows),
             0 if result["status"] == "PASS" else 1,
             result["detail"],         # "256 rows, 7 columns", or what was wrong
@@ -227,33 +218,49 @@ def main():
 
         if result["status"] == "FAIL":
             log.error(f"{name} failed C1. Nothing was loaded.")
-            conn.close()
-            sys.exit(1)
+            return "FAIL"
 
-        landed = land_extract(conn,table,rows,args.period,run_id,log)
+        landed = land_extract(conn,table,rows,period,run_id,log)
 
-        r1 = reconcile_r1(conn, table, landed, args.period, log)
+        r1 = reconcile_r1(conn, table, landed, period, log)
         results.append(r1)
 
         # R1's line. rows_tested is this quarter's rows -- the ones R1 actually tied, 
         # not the whole file. Each control counts what it looked at. 
         record_results(
-            conn, run_id, "R1","File to raw reconciliation", table, args.period,
+            conn, run_id, "R1","File to raw reconciliation", table, period,
             r1["status"], len(landed),
             0 if r1["status"] == "PASS" else 1,
             r1["detail"],             # "file 32 rows/296,230.92  vs.  table 32 rows / ...... "
          )
         conn.commit()
 
-    conn.close()
-
     if [r for r in results if r["status"] == "FAIL"]:
         log.error("R1 did not tie. The raw layer does not match the files.")
+        return "FAIL"
+
+    return "PASS"
+
+
+def main():
+    """Load one quarter into the real database."""
+    args = parse_arg()
+    run_id = new_run_id()
+    log = setup_logger(run_id)
+    settings = load_settings()
+
+    log.info(f"Load started for {args.period}.")
+
+    conn = connect(settings)
+    create_schema(conn,log)
+    land_reference(conn,settings,run_id,log)   # reference tables before the extracts
+    outcome = load(conn, settings, args.period, run_id, log)
+    conn.close()
+
+    if outcome != "PASS":
         sys.exit(1)
 
-
     log.info("Load finished. R1 tied for both extracts.")
-
 
 
 if __name__=="__main__":

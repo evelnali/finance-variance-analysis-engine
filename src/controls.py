@@ -140,7 +140,29 @@ def parse_args():
     return p.parse_args()
 
 
+
+def run_controls(conn, period, run_id, log):
+    """Run C2 to C5 over both raw tables for one quarter. Hands back "PASS" or "FAIL".
+
+    The connection and the run number come in as inputs, so run.py can use one
+    connection and one run number for the whole pipeline.
+    """
+    failures = 0
+    for table in RAW_TABLES.values():
+       failures += run_c2(conn, table, period, run_id, log)
+       failures += run_c3(conn, table, period, run_id, log)
+       failures += run_c4(conn, table, period, run_id, log)
+       failures += run_c5(conn, table, period, run_id, log)
+
+    if failures:
+        log.error(f"Controls failed. {failures} exceptions written to the exceptions table.")
+        return "FAIL"
+
+    return "PASS"
+
+
 def main():
+    """Run the controls for one quarter on the real database."""
     args = parse_args()
     run_id = new_run_id()
     log = setup_logger(run_id)
@@ -148,22 +170,13 @@ def main():
 
     log.info(f"Controls started for {args.period}.")
     conn = connect(settings)
-
-    failures = 0
-    for table in RAW_TABLES.values():
-       failures += run_c2(conn, table, args.period, run_id, log)
-       failures += run_c3(conn, table, args.period, run_id, log)
-       failures += run_c4(conn, table, args.period, run_id, log)
-       failures += run_c5(conn, table, args.period, run_id, log)
-
+    outcome = run_controls(conn, args.period, run_id, log)
     conn.close()
 
-    if failures:
-        log.error(f"Controls failed. {failures} exceptions written to the exceptions table.")
+    if outcome != "PASS":
         sys.exit(1)
 
     log.info("Controls finished. All passed.")
-
 
 
 if __name__ =="__main__":
