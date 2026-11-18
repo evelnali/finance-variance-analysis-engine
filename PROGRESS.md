@@ -306,3 +306,30 @@ Next: M5 — the variance views.
 
 Next: M6 — the Excel workbook, R4, and the README.
 
+
+## 2026-11-18 — M6 complete. Project finished.
+
+- src/report.py: the Excel workbook from the saved queries. Five sheets,
+  one chart (budget, flexed budget, actual). Values only, no formulas.
+- R4: the saved workbook is opened again from disk and tied to the
+  database. Thirteen checks. A workbook that fails is deleted.
+- tests/test_report.py: 5 tests. Suite is now 53.
+- src/run.py: one command runs every step on one connection and one run
+  number, and stops at the first step that fails. load.py and controls.py
+  each gained a function that takes the connection as an input.
+- A --period option on run.py was built and dropped the same day: the
+  workbook covers every quarter either way.
+- CI: on every push GitHub runs the tests and the whole pipeline on a
+  clean machine. First run green.
+- README rewritten: how to run, the controls, and each planted problem
+  against what the report shows of it.
+- Fixed on the way: "Schema conformance", R1 tolerance to one cent, the
+  comment figures in settings.yml.
+- Done-test: cloned into an empty folder and run as a stranger would.
+  53 passed, every control passed, the figures tied.
+- Slips: one line of an edit missed (R4_NAME not defined), path typed
+  for Path, a test file not yet created (collected 48, not 53), and an
+  option silently ignored by a command that no longer read options.
+
+Open, all optional: the reserve list, and a test for a word where a
+number should be.
