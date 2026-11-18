@@ -8,7 +8,9 @@ The tool is openpyxl. It works like VBA from outside Excel:
     sheet.cell(row=2, column=3).value = 100      is      Cells(2, 3).Value = 100
 """
 
-from openpyxl import Workbook
+import sys
+from pathlib import Path
+from openpyxl import Workbook, load_workbook
 from openpyxl.chart import BarChart, Reference
 from openpyxl.styles import Font, PatternFill
 from openpyxl.utils import get_column_letter
@@ -16,9 +18,20 @@ from openpyxl.utils import get_column_letter
 from src.config import PROJECT_ROOT, load_settings
 from src.logger import new_run_id, setup_logger
 from src.load import connect                          # borrowed rather than written twice
+from src.results import record_results,record_exception
 
 
 REPORT_NAME = "variance_report.xlsx"
+R4_NAME = "Analysis to report reconciliation"
+TOLERANCE = 0.01       # two figures agree when they are within a cent of each other
+
+# R4 counts the lines and adds up the varn column on these three sheets. For each:
+# the sheet, and where the same lines are in the database.
+R4_SHEETS = [
+    ("Material", "query_varn_by_class WHERE is_material = 1"),
+    ("By class", "query_varn_by_class"),
+    ("By asset", "query_varn_price_volume"),
+]
 
 # Every sheet has the same layout, so R4 knows where to find the figures.
 TITLE_ROW = 1             # what the sheet is
@@ -207,6 +220,119 @@ def build_report(conn, run_id, path, log):
     return path
 
 
+def read_sheet(sheet):
+    """Read one sheet back from a saved workbook. Hand back its headings and its lines."""
+    headings = [cell.value for cell in sheet[HEADING_ROW]]          # sheet[4] is the whole of row 4
+    # values_only=True gives the figures in the cells, not the cells themselves
+    lines = list(sheet.iter_rows(min_row=FIRST_LINE_ROW, values_only=True))
+    return headings, lines
+
+
+def column_total(headings, lines, name):
+    """Add up one column of a sheet that was read back, found by its heading."""
+    position = headings.index(name)
+    return sum(line[position] for line in lines)
+
+
+def reconcile_r4(conn, path, log):
+    """R4: the saved workbook holds the same figures as the database.
+
+    The workbook is opened again from disk, so what is checked is the file a
+    reader will open. The database is asked again with its own plain SUM and
+    COUNT, not with the queries that wrote the sheets.
+    """
+    book = load_workbook(path)
+    checks = []               # one entry per check: (name, expected, found)
+    lines_read = 0            # how many lines were read back from the file
+
+    # Summary. Expected comes from query_varn_by_asset; the sheet was written
+    # from query_varn_by_class. Two routes to the same three totals.
+    headings, lines = read_sheet(book["Summary"])
+    lines_read += len(lines)
+    quarters, total = lines[:-1], lines[-1]          # every line but the last, and the last
+    expected = conn.execute(
+        """SELECT SUM(budget_amount), SUM(actual_amount), SUM(varn)
+           FROM query_varn_by_asset""").fetchone()
+
+    # zip pairs the two lists up: "Budget" with the first figure, "Actual" with the second...
+    for heading, figure in zip(["Budget", "Actual", "Variance"], expected):
+        position = headings.index(heading)
+        checks.append((f"Summary: {heading} total", figure, total[position]))
+        # The sheet foots: the quarter lines add up to the Total line.
+        checks.append((f"Summary: quarters add up to the {heading} total",
+                       total[position], column_total(headings, quarters, heading)))
+
+    # Material, By class, By asset: the number of lines, and the varn column added up.
+    for name, source in R4_SHEETS:
+        headings, lines = read_sheet(book[name])
+        lines_read += len(lines)
+        count, varn = conn.execute(f"SELECT COUNT(*), SUM(varn) FROM {source}").fetchone()
+        checks.append((f"{name}: lines", count, len(lines)))
+        # "or 0.0": a sheet with no lines is allowed, and its total is zero
+        checks.append((f"{name}: variance total", varn or 0.0, column_total(headings, lines, "varn")))
+
+    # Controls: every line of the control log is on the sheet.
+    headings, lines = read_sheet(book["Controls"])
+    lines_read += len(lines)
+    count = conn.execute("SELECT COUNT(*) FROM control_results").fetchone()[0]
+    checks.append(("Controls: lines", count, len(lines)))
+
+    differ = []               # one sentence per check that does not tie
+    for check_name, expected, found in checks:
+        if expected is None or found is None:
+            # No total at all. A PASS over nothing is not a pass.
+            differ.append(f"{check_name}: nothing to compare")
+        elif abs(expected - found) >= TOLERANCE:
+            differ.append(f"{check_name}: expected {expected:,.2f}, found {found:,.2f}")
+
+    result = {
+        "control_id": "R4",
+        "status": "FAIL" if differ else "PASS",
+        "rows_tested": lines_read,
+        "differ": differ,
+        "detail": f"{len(checks)} checks, {len(differ)} differ - {lines_read} lines read back from the workbook",
+    }
+
+    if result["status"] == "PASS":
+        log.info(f"R4 report: PASS - {result['detail']}")
+    else:
+        log.error(f"R4 report: FAIL - {result['detail']}")
+        for what in differ:
+            log.error(f"    {what}")
+
+    return result
+
+
+def record_r4(conn, run_id, result):
+    """Write R4's line into the control log, and one exception per check that differed."""
+    for what in result["differ"]:
+        # None, None: the objection is about the workbook, not one asset or cost type
+        record_exception(conn, run_id, "R4", REPORT_NAME, "ALL", None, None, what)
+
+    record_results(conn, run_id, "R4", R4_NAME, REPORT_NAME, "ALL",
+                   result["status"], result["rows_tested"], len(result["differ"]),
+                   result["detail"])
+
+
+def report(conn, run_id, path, log):
+    """Write the workbook, reconcile it and record the result. Hands back "PASS" or "FAIL".
+
+    A workbook that fails R4 is deleted, so nothing that failed its tie-out is
+    left looking finished. The reasons stay in the control log and the exceptions.
+    """
+    build_report(conn, run_id, path, log)
+
+    result = reconcile_r4(conn, path, log)
+    record_r4(conn, run_id, result)
+    conn.commit()
+
+    if result["status"] != "PASS":
+        Path(path).unlink()                            # unlink is the word for deleting a file
+        log.error(f"The workbook did not tie to the database and has been deleted: {path}")
+
+    return result["status"]
+
+
 def main():
     """Write the report from the real database into the output folder."""
     run_id = new_run_id()
@@ -218,9 +344,14 @@ def main():
 
     log.info("Report started.")
     conn = connect(settings)
-    build_report(conn, run_id, out_dir / REPORT_NAME, log)
+    outcome = report(conn, run_id, out_dir / REPORT_NAME, log)
     conn.close()
-    log.info("Report finished.")
+
+    if outcome != "PASS":
+        log.error("Report failed. The workbook does not tie to the database; see the control log.")
+        sys.exit(1)
+
+    log.info("Report finished. The workbook ties to the database.")
 
 
 if __name__ == "__main__":
