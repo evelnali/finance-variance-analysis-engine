@@ -1,0 +1,29 @@
+# Runs on GitHub's computers after every push: installs the project from
+# nothing, runs the tests, then runs the whole pipeline.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test-and-run:
+    runs-on: ubuntu-latest          # a fresh Linux machine each time
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v6
+
+      - name: Install Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"    # the same version as on the Mac
+
+      - name: Install the packages the project needs
+        run: pip install -r requirements.txt
+
+      - name: Run the tests
+        run: python -m pytest
+
+      - name: Run the whole pipeline from the extracts
+        run: python -m src.run

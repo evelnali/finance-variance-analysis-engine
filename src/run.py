@@ -66,8 +66,6 @@ def main():
     argparse.ArgumentParser(description="Run the whole pipeline. Takes no options.").parse_args()
 
     run_id = new_run_id()
-
-    run_id = new_run_id()
     log = setup_logger(run_id)
     settings = load_settings()
 
